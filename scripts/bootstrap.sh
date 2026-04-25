@@ -111,7 +111,9 @@ helm upgrade --install sealed-secrets sealed-secrets/sealed-secrets \
 log "Waiting for sealed-secrets controller to be ready..."
 kubectl -n kube-system rollout status deploy/sealed-secrets-controller --timeout=120s
 
-# 6. Pre-generate sealed secrets (idempotent: only if not already present)
+# 6. Generate sealed secrets against the current controller's keypair.
+# A fresh `make down && make up` produces a new keypair, so any previously
+# committed sealed files are undecryptable. Always regenerate.
 gen_pw() {
   # Subshell with pipefail off — `head -c 24` exits before `tr` finishes,
   # so `tr` receives SIGPIPE (exit 141). Without this, pipefail+errexit
@@ -119,21 +121,17 @@ gen_pw() {
   ( set +o pipefail; LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom 2>/dev/null | head -c 24 )
 }
 
-if [ ! -f secrets/sealed/postgres-credentials.yaml ] || [ ! -f secrets/sealed/backend-secrets.yaml ]; then
-  log "Generating and sealing default secrets..."
-  PG_USER="kreator"
-  PG_PASS="$(gen_pw)"
-  PG_DB="kreator"
-  ./scripts/seal-secret.sh postgres-credentials default \
-    POSTGRES_USER="$PG_USER" \
-    POSTGRES_PASSWORD="$PG_PASS" \
-    POSTGRES_DB="$PG_DB"
-  DB_URL="postgresql+asyncpg://${PG_USER}:${PG_PASS}@postgres-0.postgres.default.svc.cluster.local:5432/${PG_DB}"
-  ./scripts/seal-secret.sh backend-secrets default \
-    DATABASE_URL="$DB_URL"
-else
-  log "Sealed secrets already present — skipping generation."
-fi
+log "Generating and sealing default secrets..."
+PG_USER="kreator"
+PG_PASS="$(gen_pw)"
+PG_DB="kreator"
+./scripts/seal-secret.sh postgres-credentials default \
+  POSTGRES_USER="$PG_USER" \
+  POSTGRES_PASSWORD="$PG_PASS" \
+  POSTGRES_DB="$PG_DB"
+DB_URL="postgresql+asyncpg://${PG_USER}:${PG_PASS}@postgres-0.postgres.default.svc.cluster.local:5432/${PG_DB}"
+./scripts/seal-secret.sh backend-secrets default \
+  DATABASE_URL="$DB_URL"
 
 # 7. Build and push images
 log "Building application images..."

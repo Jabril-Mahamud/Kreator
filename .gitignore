@@ -1,6 +1,10 @@
 # Secrets — never commit raw secrets
 secrets/raw/
 
+# Sealed secrets are cluster-specific (encrypted with the controller's
+# active keypair). bootstrap.sh regenerates them on every `make up`.
+secrets/sealed/
+
 # Kind cluster config (auto-generated)
 kubeconfig
 
