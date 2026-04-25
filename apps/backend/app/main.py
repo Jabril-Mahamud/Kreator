@@ -1,5 +1,3 @@
-from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,14 +5,7 @@ from app.config import settings
 from app.routes import health, items
 from app.telemetry import setup_telemetry
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    setup_telemetry(app)
-    yield
-
-
-app = FastAPI(title="Kreator Backend", lifespan=lifespan)
+app = FastAPI(title="Kreator Backend")
 
 app.add_middleware(
     CORSMiddleware,
@@ -23,6 +14,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+setup_telemetry(app)
 
 app.include_router(health.router)
 app.include_router(items.router)

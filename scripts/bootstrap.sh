@@ -53,6 +53,7 @@ if ! kind get clusters | grep -qx "$CLUSTER_NAME"; then
   kind create cluster --config kind-config.yaml --name "$CLUSTER_NAME"
 else
   log "Kind cluster '${CLUSTER_NAME}' already exists."
+  kind export kubeconfig --name "$CLUSTER_NAME" >/dev/null
 fi
 
 # Ensure kubectl context
@@ -111,7 +112,12 @@ log "Waiting for sealed-secrets controller to be ready..."
 kubectl -n kube-system rollout status deploy/sealed-secrets-controller --timeout=120s
 
 # 6. Pre-generate sealed secrets (idempotent: only if not already present)
-gen_pw() { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 24; }
+gen_pw() {
+  # Subshell with pipefail off — `head -c 24` exits before `tr` finishes,
+  # so `tr` receives SIGPIPE (exit 141). Without this, pipefail+errexit
+  # aborts the whole bootstrap.
+  ( set +o pipefail; LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom 2>/dev/null | head -c 24 )
+}
 
 if [ ! -f secrets/sealed/postgres-credentials.yaml ] || [ ! -f secrets/sealed/backend-secrets.yaml ]; then
   log "Generating and sealing default secrets..."

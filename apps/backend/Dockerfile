@@ -12,7 +12,9 @@ RUN pip install --prefix=/install .
 
 FROM python:3.12-slim AS runner
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH=/install/bin:$PATH
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    PATH=/install/bin:$PATH \
+    PYTHONPATH=/install/lib/python3.12/site-packages
 
 RUN groupadd --system --gid 1001 app \
  && useradd --system --uid 1001 --gid 1001 --no-create-home --shell /usr/sbin/nologin app

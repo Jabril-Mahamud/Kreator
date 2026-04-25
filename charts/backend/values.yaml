@@ -1,7 +1,7 @@
 image:
   repository: localhost:5001/kreator-backend
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 replicaCount: 1
 
