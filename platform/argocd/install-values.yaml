@@ -11,8 +11,8 @@ configs:
     admin.enabled: "true"
     timeout.reconciliation: 30s
   secret:
-    # bcrypt hash of "admin"
-    argocdServerAdminPassword: "$2a$10$rRyBsGSHK6.uc8fntPwVIuLVHgsAhAX7TcdrqW/RADU0uh7CaChLa"
+    # bcrypt hash of "admin" (verified)
+    argocdServerAdminPassword: "$2b$10$d/DEUixH7Kt3rEXvF0Dsb..Rk1KppqW6WEr0GxslcGOLu8VZFGn3y"
     argocdServerAdminPasswordMtime: "2026-01-01T00:00:00Z"
 
 server:
