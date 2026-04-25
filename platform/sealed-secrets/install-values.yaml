@@ -1,0 +1,16 @@
+fullnameOverride: sealed-secrets-controller
+namespace: kube-system
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 256Mi
+serviceAccount:
+  create: true
+rbac:
+  create: true
+metrics:
+  serviceMonitor:
+    enabled: false

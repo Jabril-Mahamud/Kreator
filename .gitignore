@@ -1,0 +1,27 @@
+# Secrets — never commit raw secrets
+secrets/raw/
+
+# Kind cluster config (auto-generated)
+kubeconfig
+
+# Docker
+.docker/
+
+# Node
+node_modules/
+.next/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,53 @@
+global:
+  domain: argocd.localhost
+
+dex:
+  enabled: false
+
+configs:
+  params:
+    server.insecure: true
+  cm:
+    admin.enabled: "true"
+    timeout.reconciliation: 30s
+  secret:
+    # bcrypt hash of "admin"
+    argocdServerAdminPassword: "$2a$10$rRyBsGSHK6.uc8fntPwVIuLVHgsAhAX7TcdrqW/RADU0uh7CaChLa"
+    argocdServerAdminPasswordMtime: "2026-01-01T00:00:00Z"
+
+server:
+  extraArgs:
+    - --insecure
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: argocd.localhost
+    tls: false
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+  service:
+    type: ClusterIP
+
+controller:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+repoServer:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+applicationSet:
+  enabled: false
+
+notifications:
+  enabled: false
