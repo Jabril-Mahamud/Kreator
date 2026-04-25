@@ -27,5 +27,5 @@ spec:
     - group: apps
       kind: StatefulSet
       name: postgres
-      jqPathExpressions:
-        - .spec.volumeClaimTemplates[].spec.volumeMode
+      jsonPointers:
+        - /spec/volumeClaimTemplates

@@ -169,8 +169,8 @@ for f in "${APPS_TO_APPLY[@]}"; do
 done
 
 # 10. Wait for sync
-log "Waiting for ArgoCD applications to become Synced+Healthy (timeout 5m)..."
-deadline=$(( $(date +%s) + 300 ))
+log "Waiting for ArgoCD applications to become Synced+Healthy (timeout 10m)..."
+deadline=$(( $(date +%s) + 600 ))
 while :; do
   not_ready=$(kubectl -n argocd get applications.argoproj.io \
     -o jsonpath='{range .items[*]}{.metadata.name}={.status.sync.status},{.status.health.status}{"\n"}{end}' \
