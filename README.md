@@ -79,17 +79,19 @@ make seal-secret NAME=my-app NS=default ARGS="API_KEY=abc DB_URL=postgres://..."
 ./scripts/seal-secret.sh my-app default API_KEY=abc DB_URL=postgres://...
 ```
 
-`bootstrap.sh` pre-generates `postgres-credentials` and `backend-secrets` on first run.
+`bootstrap.sh` regenerates `postgres-credentials` and `backend-secrets` on every `make up`. Sealed files are encrypted with the controller's per-cluster keypair, so a teardown invalidates whatever was sealed before — `secrets/sealed/` is therefore gitignored and rebuilt fresh each run.
 
 ---
 
-## ArgoCD + local repo workflow
+## ArgoCD + repo workflow
 
 `platform/argocd/root-app.yaml` defines a root Application that syncs everything in `argocd-apps/`. Each file there is an Application CR pointing at either a chart in this repo (`charts/{frontend,backend,postgres}`) or an upstream Grafana chart with values from `platform/observability/`.
 
-The Application CRs use a placeholder `repoURL` of `https://github.com/USER/kreator.git`. After forking, replace `USER` with your GitHub username (or whatever git remote you push to) in:
+After forking, point ArgoCD at your fork by replacing `https://github.com/Jabril-Mahamud/Kreator.git` with your repo URL in:
 - `platform/argocd/root-app.yaml`
 - `argocd-apps/*.yaml`
+
+ArgoCD pulls the chart and Application sources from `main` of that URL — local edits to `charts/` or `argocd-apps/` won't take effect in the cluster until they're committed and pushed.
 
 Sync waves: `postgres` (0) → `backend` (1) → `frontend` (2). Observability components sync in parallel at wave 0.
 
@@ -111,9 +113,11 @@ Sync waves: `postgres` (0) → `backend` (1) → `frontend` (2). Observability c
 
 The frontend, backend, and Postgres still come up — only Loki/Promtail/Tempo/Mimir/Grafana are skipped.
 
-**Images aren't picked up after a code change.** Run `make rebuild` — it rebuilds and restarts the Deployments.
+**Images aren't picked up after a code change.** Run `make rebuild` — it rebuilds, pushes to the local registry, and restarts the Deployments. Both app charts use `imagePullPolicy: Always`, so the rolled pod actually pulls the new `:latest`.
 
-**ArgoCD Applications stay OutOfSync.** Open http://argocd.localhost and check each Application's events tab. The most common cause is the placeholder `repoURL` not matching a real git remote.
+**ArgoCD Applications stay OutOfSync after editing a chart.** ArgoCD pulls from the git remote, not your working tree. Commit and push to `main` (or whichever branch the Applications target) before refreshing.
+
+**`make up` finishes but `backend` and `postgres` are stuck in `CreateContainerConfigError` with `secret … not found`.** The committed sealed files were encrypted against a previous cluster's keypair. Delete `secrets/sealed/*.yaml` and re-run `make up` — bootstrap will reseal against the current controller. (This is now the default; old clones may still need the manual cleanup once.)
 
 ---
 
