@@ -8,6 +8,11 @@ replicaCount: 1
 service:
   port: 8000
 
+ingress:
+  enabled: true
+  className: nginx
+  host: api.localhost
+
 env:
   APP_ENV: local
   LOG_LEVEL: INFO
