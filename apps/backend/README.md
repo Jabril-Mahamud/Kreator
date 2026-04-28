@@ -5,8 +5,8 @@ FastAPI service exposing CRUD over `items`, instrumented with OpenTelemetry and 
 ## Local development
 
 ```bash
+cp .env.example .env   # edit if your Postgres differs
 pip install -e .
-export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/kreator
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
