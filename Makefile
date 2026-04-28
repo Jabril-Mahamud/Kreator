@@ -10,8 +10,8 @@ up:                    ## Bootstrap the entire stack
 down:                  ## Tear down cluster and registry
 	./scripts/teardown.sh
 
-build:                 ## Build and push images to local registry
-	./scripts/build-images.sh all
+build:                 ## Build and push all app images to local registry
+	./scripts/build-images.sh
 
 rebuild: build         ## Rebuild images and restart deployments
 	kubectl rollout restart deployment/frontend deployment/backend
