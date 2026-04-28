@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Non-negotiable rules
+
+- Never mention "Claude", "Anthropic", or any AI tool in commit messages, code comments, PR descriptions, branch names, or any file in this repository. All work must appear as written by the repo owner.
+
 ## What this repo is
 
 Kreator is a batteries-included local Kubernetes starter. `make up` provisions a Kind cluster running a Next.js frontend, FastAPI backend, Postgres, ArgoCD, Sealed Secrets, and the LGTM observability stack (Loki/Grafana/Tempo/Mimir). `make down` tears it all down.
