@@ -1,3 +1,8 @@
+# Env files
+.env
+.env.local
+.env*.local
+
 # Secrets — never commit raw secrets
 secrets/raw/
 

@@ -154,7 +154,18 @@ if compgen -G "secrets/sealed/*.yaml" >/dev/null; then
 fi
 
 log "Applying ArgoCD root application and app definitions..."
-kubectl apply -f platform/argocd/root-app.yaml
+# Rewrite the canonical repo URL to whatever remote this clone uses.
+CANONICAL_REPO_URL="https://github.com/Jabril-Mahamud/Kreator.git"
+REMOTE_REPO_URL=$(git remote get-url origin 2>/dev/null || true)
+patch_repo_url() {
+  if [ -n "$REMOTE_REPO_URL" ] && [ "$REMOTE_REPO_URL" != "$CANONICAL_REPO_URL" ]; then
+    sed "s|${CANONICAL_REPO_URL}|${REMOTE_REPO_URL}|g"
+  else
+    cat
+  fi
+}
+
+patch_repo_url < platform/argocd/root-app.yaml | kubectl apply -f -
 
 APPS_TO_APPLY=(postgres.yaml backend.yaml frontend.yaml)
 if [ "$NO_OBSERVABILITY" -eq 0 ]; then
@@ -163,7 +174,7 @@ else
   warn "--no-observability: skipping LGTM applications."
 fi
 for f in "${APPS_TO_APPLY[@]}"; do
-  kubectl apply -f "argocd-apps/$f"
+  patch_repo_url < "argocd-apps/$f" | kubectl apply -f -
 done
 
 # 10. Wait for sync
