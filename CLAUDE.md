@@ -41,7 +41,8 @@ npm run build   # Production build (required before Dockerfile builds)
 
 ### Images & secrets
 ```bash
-make build                       # Build and push both images to localhost:5001
+make build                            # Build all apps in apps/ that have a Dockerfile
+./scripts/build-images.sh backend     # Build a single named app
 make seal-secret NAME=foo NS=default ARGS="KEY=val"  # Seal a secret
 ```
 
@@ -82,8 +83,13 @@ Sealed files are encrypted against the cluster's per-run keypair. After `make do
 ### Helm charts (`charts/`)
 Each of the three app charts (`backend`, `frontend`, `postgres`) follows the same structure: `Chart.yaml`, `values.yaml`, `templates/_helpers.tpl` (standard labels), and per-resource YAML. The backend chart includes an HPA and references the `backend-secrets` SealedSecret by name (not defining it). The postgres chart is a StatefulSet with `volumeClaimTemplates`.
 
+### Adding a new app
+1. Create `apps/<name>/Dockerfile` — `build-images.sh` auto-discovers it and builds `localhost:5001/kreator-<name>:latest`.
+2. Add a Helm chart under `charts/<name>/` (copy `charts/frontend` or `charts/backend` as a starting point and adjust port/probes/values).
+3. Add an ArgoCD Application CR in `argocd-apps/<name>.yaml` pointing at `charts/<name>`.
+
 ### Local registry
-A `registry:2` container named `kind-registry` runs on `localhost:5001`. Kind nodes are patched to trust it via `containerdConfigPatches` in `kind-config.yaml`. Images are tagged and pushed as `localhost:5001/kreator-{frontend,backend}:latest`; both app charts default to `imagePullPolicy: Always`.
+A `registry:2` container named `kind-registry` runs on `localhost:5001`. Kind nodes are patched to trust it via `containerdConfigPatches` in `kind-config.yaml`. Images are tagged `localhost:5001/kreator-<name>:latest`; app charts should set `imagePullPolicy: Always`.
 
 ### After forking
 Replace `https://github.com/Jabril-Mahamud/Kreator.git` with your repo URL in:

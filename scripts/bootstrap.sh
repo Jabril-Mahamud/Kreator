@@ -135,7 +135,7 @@ DB_URL="postgresql+asyncpg://${PG_USER}:${PG_PASS}@postgres-0.postgres.default.s
 
 # 7. Build and push images
 log "Building application images..."
-./scripts/build-images.sh all
+./scripts/build-images.sh
 
 # 8. ArgoCD
 log "Installing ArgoCD..."
