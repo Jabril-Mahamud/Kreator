@@ -5,8 +5,8 @@ Minimal Next.js 14 (App Router, TypeScript) UI for the Kreator backend.
 ## Local development
 
 ```bash
+cp .env.local.example .env.local   # edit if your backend runs elsewhere
 npm install
-export NEXT_PUBLIC_API_URL=http://localhost:8000
 npm run dev
 ```
 
