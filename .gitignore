@@ -1,7 +1,6 @@
-
-# Ignore all Markdown files
-*.md
-
-# Except README files (case-insensitive, in any directory)
-!**/README.md
-!**/readme.md
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.eggs/
