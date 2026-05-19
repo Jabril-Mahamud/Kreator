@@ -1,0 +1,23 @@
+# {{ name }}
+
+Full-stack application scaffolded with Kreator.
+
+## Quick start
+
+```bash
+kreator dev        # spin up local Kind cluster with ArgoCD + Crossplane
+kreator deploy     # provision infrastructure on {{ provider }} and deploy
+kreator destroy    # tear down all resources
+```
+
+## Project structure
+
+- `apps/frontend/` - {{ frontend }} frontend application
+- `apps/backend/` - {{ backend }} backend application
+- `infrastructure/` - Crossplane XRDs, compositions, and claims
+- `deploy/` - ArgoCD applications and Helm charts
+- `secrets/` - sealed secrets
+
+## Configuration
+
+See `kreator.yaml` for project settings.
