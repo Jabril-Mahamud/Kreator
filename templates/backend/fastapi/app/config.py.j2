@@ -1,0 +1,14 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    app_name: str = "{{ name }}-backend"
+    debug: bool = False
+    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/{{ name | replace('-', '_') }}"
+    otlp_endpoint: str = "http://localhost:4317"
+    otlp_enabled: bool = False
+
+    model_config = {"env_prefix": "{{ name | upper | replace('-', '_') }}_"}
+
+
+settings = Settings()

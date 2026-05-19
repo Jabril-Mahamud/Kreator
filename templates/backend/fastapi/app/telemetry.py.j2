@@ -1,0 +1,31 @@
+import logging
+
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from pythonjsonlogger import json as json_logger
+
+from app.config import settings
+
+
+def setup_logging() -> None:
+    handler = logging.StreamHandler()
+    formatter = json_logger.JsonFormatter(
+        fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
+        rename_fields={"asctime": "timestamp", "levelname": "level"},
+    )
+    handler.setFormatter(formatter)
+    logging.root.handlers = [handler]
+    logging.root.setLevel(logging.DEBUG if settings.debug else logging.INFO)
+
+
+def setup_tracing(app) -> None:
+    if not settings.otlp_enabled:
+        return
+    provider = TracerProvider()
+    exporter = OTLPSpanExporter(endpoint=settings.otlp_endpoint)
+    provider.add_span_processor(BatchSpanProcessor(exporter))
+    trace.set_tracer_provider(provider)
+    FastAPIInstrumentor.instrument_app(app)
