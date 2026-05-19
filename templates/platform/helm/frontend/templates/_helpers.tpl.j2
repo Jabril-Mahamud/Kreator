@@ -1,0 +1,14 @@
+{% raw %}{{- define "frontend.name" -}}{% endraw %}{{ name }}-frontend{% raw %}{{- end -}}{% endraw %}
+
+{% raw %}{{- define "frontend.fullname" -}}{{ .Release.Name }}-frontend{{- end -}}{% endraw %}
+
+{% raw %}{{- define "frontend.labels" -}}
+app.kubernetes.io/name: {{ include "frontend.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end -}}{% endraw %}
+
+{% raw %}{{- define "frontend.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "frontend.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}{% endraw %}

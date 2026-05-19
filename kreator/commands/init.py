@@ -7,6 +7,17 @@ from kreator.core.renderer import render_template_dir
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates"
 
+PLATFORM_MAPPINGS = [
+    ("platform/crossplane/xrds", "infrastructure/xrds"),
+    ("platform/crossplane/compositions/local", "infrastructure/compositions/local"),
+    ("platform/crossplane/compositions/civo", "infrastructure/compositions/civo"),
+    ("platform/crossplane/provider-configs", "infrastructure/provider-configs"),
+    ("platform/crossplane/claims", "infrastructure/claims"),
+    ("platform/argocd", "deploy/argocd"),
+    ("platform/helm/frontend", "deploy/helm/frontend"),
+    ("platform/helm/backend", "deploy/helm/backend"),
+]
+
 
 def init_command(
     name: str = typer.Argument(help="Project name (lowercase, alphanumeric, hyphens)"),
@@ -53,6 +64,16 @@ def init_command(
         apps_dir = project_dir / "apps" / "frontend"
         apps_dir.mkdir(parents=True, exist_ok=True)
         render_template_dir(frontend_template, apps_dir, context)
+
+    for src_rel, dest_rel in PLATFORM_MAPPINGS:
+        src = TEMPLATES_DIR / src_rel
+        if src.exists():
+            dest = project_dir / dest_rel
+            dest.mkdir(parents=True, exist_ok=True)
+            render_template_dir(src, dest, context)
+
+    (project_dir / "secrets" / "raw").mkdir(parents=True, exist_ok=True)
+    (project_dir / "secrets" / "sealed").mkdir(parents=True, exist_ok=True)
 
     save_config(config, project_dir / "kreator.yaml")
 

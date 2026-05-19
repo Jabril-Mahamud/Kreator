@@ -6,6 +6,19 @@ from kreator.main import app
 
 runner = CliRunner()
 
+INIT_ARGS = [
+    "init",
+    "test-proj",
+    "--frontend",
+    "nextjs",
+    "--backend",
+    "fastapi",
+    "--provider",
+    "civo",
+    "--region",
+    "lon1",
+]
+
 
 def test_init_creates_project(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
@@ -31,21 +44,7 @@ def test_init_creates_project(tmp_path: Path, monkeypatch):
 
 def test_init_creates_kreator_yaml(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    runner.invoke(
-        app,
-        [
-            "init",
-            "test-proj",
-            "--frontend",
-            "nextjs",
-            "--backend",
-            "fastapi",
-            "--provider",
-            "civo",
-            "--region",
-            "lon1",
-        ],
-    )
+    runner.invoke(app, INIT_ARGS)
     kreator_yaml = tmp_path / "test-proj" / "kreator.yaml"
     assert kreator_yaml.exists()
     content = kreator_yaml.read_text()
@@ -54,21 +53,7 @@ def test_init_creates_kreator_yaml(tmp_path: Path, monkeypatch):
 
 def test_init_creates_backend(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    runner.invoke(
-        app,
-        [
-            "init",
-            "test-proj",
-            "--frontend",
-            "nextjs",
-            "--backend",
-            "fastapi",
-            "--provider",
-            "civo",
-            "--region",
-            "lon1",
-        ],
-    )
+    runner.invoke(app, INIT_ARGS)
     backend = tmp_path / "test-proj" / "apps" / "backend"
     assert backend.exists()
     assert (backend / "app" / "main.py").exists()
@@ -84,21 +69,7 @@ def test_init_creates_backend(tmp_path: Path, monkeypatch):
 
 def test_init_creates_frontend(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    runner.invoke(
-        app,
-        [
-            "init",
-            "test-proj",
-            "--frontend",
-            "nextjs",
-            "--backend",
-            "fastapi",
-            "--provider",
-            "civo",
-            "--region",
-            "lon1",
-        ],
-    )
+    runner.invoke(app, INIT_ARGS)
     frontend = tmp_path / "test-proj" / "apps" / "frontend"
     assert frontend.exists()
     assert (frontend / "package.json").exists()
@@ -110,25 +81,44 @@ def test_init_creates_frontend(tmp_path: Path, monkeypatch):
 
 def test_init_creates_project_files(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    runner.invoke(
-        app,
-        [
-            "init",
-            "test-proj",
-            "--frontend",
-            "nextjs",
-            "--backend",
-            "fastapi",
-            "--provider",
-            "civo",
-            "--region",
-            "lon1",
-        ],
-    )
+    runner.invoke(app, INIT_ARGS)
     project = tmp_path / "test-proj"
     assert (project / "Makefile").exists()
     assert (project / "README.md").exists()
     assert (project / ".gitignore").exists()
+
+
+def test_init_creates_infrastructure(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, INIT_ARGS)
+    infra = tmp_path / "test-proj" / "infrastructure"
+    assert (infra / "xrds" / "database.yaml").exists()
+    assert (infra / "compositions" / "local" / "database.yaml").exists()
+    assert (infra / "claims" / "database.yaml").exists()
+    assert (infra / "provider-configs" / "local.yaml").exists()
+
+
+def test_init_creates_deploy(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, INIT_ARGS)
+    deploy = tmp_path / "test-proj" / "deploy"
+    assert (deploy / "argocd" / "root-app.yaml").exists()
+    assert (deploy / "argocd" / "apps" / "frontend.yaml").exists()
+    assert (deploy / "argocd" / "apps" / "backend.yaml").exists()
+    assert (deploy / "argocd" / "apps" / "database.yaml").exists()
+    assert (deploy / "helm" / "backend" / "Chart.yaml").exists()
+    assert (deploy / "helm" / "backend" / "values.yaml").exists()
+    assert (deploy / "helm" / "backend" / "templates" / "deployment.yaml").exists()
+    assert (deploy / "helm" / "frontend" / "Chart.yaml").exists()
+    assert (deploy / "helm" / "frontend" / "values.yaml").exists()
+
+
+def test_init_creates_secrets_dirs(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    runner.invoke(app, INIT_ARGS)
+    secrets = tmp_path / "test-proj" / "secrets"
+    assert (secrets / "raw").is_dir()
+    assert (secrets / "sealed").is_dir()
 
 
 def test_init_renders_project_name_in_templates(tmp_path: Path, monkeypatch):
@@ -153,6 +143,9 @@ def test_init_renders_project_name_in_templates(tmp_path: Path, monkeypatch):
 
     pyproject = (tmp_path / "cool-app" / "apps" / "backend" / "pyproject.toml").read_text()
     assert "cool-app-backend" in pyproject
+
+    helm_chart = (tmp_path / "cool-app" / "deploy" / "helm" / "backend" / "Chart.yaml").read_text()
+    assert "cool-app-backend" in helm_chart
 
 
 def test_init_rejects_existing_directory(tmp_path: Path, monkeypatch):

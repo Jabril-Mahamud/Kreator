@@ -223,32 +223,32 @@ Generated Helm charts follow these conventions:
 ## Build phases
 
 ### Phase 1: CLI skeleton + template engine
-- [ ] Python package with Typer CLI (`kreator init`, `kreator dev`, `kreator deploy` as stubs)
-- [ ] Jinja2 template renderer that walks a template directory and renders into an output directory
-- [ ] kreator.yaml config loader and validator (Pydantic model)
-- [ ] Next.js app template (functional app with API client, health indicator, item CRUD)
-- [ ] FastAPI app template (functional app with health, CRUD, telemetry, alembic)
-- [ ] Dockerfiles for both apps (multi-stage, non-root)
-- [ ] Generated .gitignore, README.md, Makefile
-- [ ] `kreator init my-app` produces a working project where `cd my-app/apps/backend && pip install -e . && uvicorn app.main:app` works
-- [ ] Unit tests for renderer and config loader
-- [ ] `pip install -e .` installs the `kreator` command
+- [x] Python package with Typer CLI (`kreator init`, `kreator dev`, `kreator deploy` as stubs)
+- [x] Jinja2 template renderer that walks a template directory and renders into an output directory
+- [x] kreator.yaml config loader and validator (Pydantic model)
+- [x] Next.js app template (functional app with API client, health indicator, item CRUD)
+- [x] FastAPI app template (functional app with health, CRUD, telemetry, alembic)
+- [x] Dockerfiles for both apps (multi-stage, non-root)
+- [x] Generated .gitignore, README.md, Makefile
+- [x] `kreator init my-app` produces a working project where `cd my-app/apps/backend && pip install -e . && uvicorn app.main:app` works
+- [x] Unit tests for renderer and config loader
+- [x] `pip install -e .` installs the `kreator` command
 
 **Done when:** `kreator init my-app` generates a complete project, both apps run locally outside Kubernetes.
 
 ### Phase 2: Local dev with Kind + Crossplane + ArgoCD
-- [ ] Kind cluster lifecycle (create, delete, registry, node config)
-- [ ] Platform installer: Crossplane (with provider-kubernetes), ArgoCD, ingress-nginx, Sealed Secrets
-- [ ] Crossplane XRD for Database
-- [ ] Local Composition: postgres StatefulSet + Service + Secret via provider-kubernetes
-- [ ] Generated Helm charts for frontend and backend (from templates)
-- [ ] Generated ArgoCD Application CRs (App-of-Apps)
-- [ ] Sealed Secrets generation (postgres creds, backend DATABASE_URL)
-- [ ] Image build + push to local registry
-- [ ] ArgoCD pointed at local git repo
-- [ ] `kreator dev` runs the full pipeline: cluster up, platform installed, app deployed via ArgoCD, Crossplane provisions database
-- [ ] `kreator dev --destroy` tears it down
-- [ ] Access URLs: frontend.localhost, api.localhost, argocd.localhost
+- [x] Kind cluster lifecycle (create, delete, registry, node config)
+- [x] Platform installer: Crossplane (with provider-kubernetes), ArgoCD, ingress-nginx, Sealed Secrets
+- [x] Crossplane XRD for Database
+- [x] Local Composition: postgres StatefulSet + Service + Secret via provider-kubernetes
+- [x] Generated Helm charts for frontend and backend (from templates)
+- [x] Generated ArgoCD Application CRs (App-of-Apps)
+- [x] Sealed Secrets generation (postgres creds, backend DATABASE_URL)
+- [x] Image build + push to local registry
+- [x] ArgoCD pointed at local git repo
+- [x] `kreator dev` runs the full pipeline: cluster up, platform installed, app deployed via ArgoCD, Crossplane provisions database
+- [x] `kreator dev --destroy` tears it down
+- [x] Access URLs: frontend.localhost, api.localhost, argocd.localhost
 
 **Done when:** `kreator init my-app && cd my-app && kreator dev` produces a running app on Kind, deployed through ArgoCD, with database provisioned by Crossplane.
 

@@ -1,0 +1,13 @@
+apiVersion: kreator.dev/v1alpha1
+kind: Database
+metadata:
+  name: {{ name }}-db
+  namespace: default
+spec:
+  parameters:
+    name: {{ name }}
+    database: {{ database }}
+    storageSize: 1Gi
+  compositionSelector:
+    matchLabels:
+      provider: local

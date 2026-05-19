@@ -1,0 +1,174 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: local-database
+  labels:
+    crossplane.io/xrd: xdatabases.kreator.dev
+    provider: local
+spec:
+  compositeTypeRef:
+    apiVersion: kreator.dev/v1alpha1
+    kind: XDatabase
+  resources:
+    - name: postgres-secret
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                namespace: default
+              type: Opaque
+              stringData:
+                POSTGRES_USER: postgres
+                POSTGRES_PASSWORD: postgres
+                POSTGRES_DB: {{ name | replace('-', '_') }}
+                DATABASE_URL: "postgresql+asyncpg://postgres:postgres@{{ name }}-db:5432/{{ name | replace('-', '_') }}"
+          providerConfigRef:
+            name: default
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.name
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-db-credentials"
+                type: Format
+
+    - name: postgres-service
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                namespace: default
+              spec:
+                clusterIP: None
+                ports:
+                  - port: 5432
+                    targetPort: 5432
+                selector: {}
+          providerConfigRef:
+            name: default
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.name
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-db"
+                type: Format
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.name
+          toFieldPath: spec.forProvider.manifest.spec.selector.app
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-db"
+                type: Format
+
+    - name: postgres-statefulset
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: apps/v1
+              kind: StatefulSet
+              metadata:
+                namespace: default
+              spec:
+                replicas: 1
+                selector:
+                  matchLabels: {}
+                serviceName: ""
+                template:
+                  metadata:
+                    labels: {}
+                  spec:
+                    containers:
+                      - name: postgres
+                        image: postgres:16-alpine
+                        ports:
+                          - containerPort: 5432
+                        env:
+                          - name: POSTGRES_USER
+                            value: postgres
+                          - name: POSTGRES_PASSWORD
+                            value: postgres
+                          - name: POSTGRES_DB
+                            value: {{ name | replace('-', '_') }}
+                        volumeMounts:
+                          - name: data
+                            mountPath: /var/lib/postgresql/data
+                        resources:
+                          requests:
+                            cpu: 100m
+                            memory: 256Mi
+                          limits:
+                            cpu: 500m
+                            memory: 512Mi
+                        readinessProbe:
+                          exec:
+                            command:
+                              - pg_isready
+                              - -U
+                              - postgres
+                          initialDelaySeconds: 5
+                          periodSeconds: 5
+                volumeClaimTemplates:
+                  - metadata:
+                      name: data
+                    spec:
+                      accessModes: ["ReadWriteOnce"]
+                      resources:
+                        requests:
+                          storage: 1Gi
+          providerConfigRef:
+            name: default
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.name
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-db"
+                type: Format
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.name
+          toFieldPath: spec.forProvider.manifest.spec.selector.matchLabels.app
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-db"
+                type: Format
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.name
+          toFieldPath: spec.forProvider.manifest.spec.serviceName
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-db"
+                type: Format
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.name
+          toFieldPath: spec.forProvider.manifest.spec.template.metadata.labels.app
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-db"
+                type: Format
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.storageSize
+          toFieldPath: spec.forProvider.manifest.spec.volumeClaimTemplates[0].spec.resources.requests.storage
