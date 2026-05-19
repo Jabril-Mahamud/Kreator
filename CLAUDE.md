@@ -263,11 +263,11 @@ Generated Helm charts follow these conventions:
 **Done when:** `kreator deploy` provisions a Civo cluster and database, deploys the app via ArgoCD.
 
 ### Phase 4: Observability + second template
-- [ ] LGTM stack as opt-in addon (`kreator dev --with-observability`)
-- [ ] Grafana dashboard template
-- [ ] Pre-configured datasources (Loki, Tempo, Mimir)
-- [ ] Second frontend template (e.g. React/Vite) or second backend template (e.g. Express)
-- [ ] Verify interchangeability: `kreator init --frontend react --backend express` works end to end
+- [x] LGTM stack as opt-in addon (`kreator dev --with-observability`)
+- [x] Grafana dashboard template
+- [x] Pre-configured datasources (Loki, Tempo, Mimir)
+- [x] Second frontend template (e.g. React/Vite) or second backend template (e.g. Express)
+- [x] Verify interchangeability: `kreator init --frontend react --backend express` works end to end
 
 **Done when:** Observability works as an addon, two stack combinations are supported.
 

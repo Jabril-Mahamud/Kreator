@@ -52,14 +52,24 @@ def test_invalid_name_empty():
         KreatorConfig(name="")
 
 
+def test_valid_react_frontend():
+    config = KreatorConfig(name="test", frontend="react")
+    assert config.frontend == "react"
+
+
+def test_valid_express_backend():
+    config = KreatorConfig(name="test", backend="express")
+    assert config.backend == "express"
+
+
 def test_invalid_frontend():
     with pytest.raises(ValidationError, match="frontend must be one of"):
-        KreatorConfig(name="test", frontend="react")
+        KreatorConfig(name="test", frontend="svelte")
 
 
 def test_invalid_backend():
     with pytest.raises(ValidationError, match="backend must be one of"):
-        KreatorConfig(name="test", backend="express")
+        KreatorConfig(name="test", backend="django")
 
 
 def test_invalid_provider():

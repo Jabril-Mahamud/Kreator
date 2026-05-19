@@ -26,7 +26,7 @@ class KreatorConfig(BaseModel):
     @field_validator("frontend")
     @classmethod
     def validate_frontend(cls, v: str) -> str:
-        allowed = {"nextjs"}
+        allowed = {"nextjs", "react"}
         if v not in allowed:
             raise ValueError(f"frontend must be one of: {', '.join(sorted(allowed))}")
         return v
@@ -34,7 +34,7 @@ class KreatorConfig(BaseModel):
     @field_validator("backend")
     @classmethod
     def validate_backend(cls, v: str) -> str:
-        allowed = {"fastapi"}
+        allowed = {"fastapi", "express"}
         if v not in allowed:
             raise ValueError(f"backend must be one of: {', '.join(sorted(allowed))}")
         return v

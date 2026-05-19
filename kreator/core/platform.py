@@ -231,6 +231,142 @@ def apply_yaml_dir(directory: Path, context: str, namespace: str | None = None) 
         _kubectl(["apply", "-f", str(yaml_file)] + ns_args, context=context)
 
 
+def install_observability(context: str, project_dir: Path) -> None:
+    obs_dir = project_dir / "deploy" / "observability"
+    if not obs_dir.exists():
+        typer.echo("No observability templates found, skipping")
+        return
+
+    typer.echo("Installing observability stack (LGTM)...")
+    _kubectl(["create", "namespace", "observability"], context=context)
+
+    _helm(["repo", "add", "grafana", "https://grafana.github.io/helm-charts"], context=context)
+    _helm(["repo", "update"], context=context)
+
+    loki_values = obs_dir / "loki-values.yaml"
+    if loki_values.exists():
+        typer.echo("Installing Loki...")
+        _helm(
+            [
+                "upgrade",
+                "--install",
+                "loki",
+                "grafana/loki",
+                "--namespace",
+                "observability",
+                "-f",
+                str(loki_values),
+                "--wait",
+                "--timeout",
+                "5m",
+            ],
+            context=context,
+        )
+
+    tempo_values = obs_dir / "tempo-values.yaml"
+    if tempo_values.exists():
+        typer.echo("Installing Tempo...")
+        _helm(
+            [
+                "upgrade",
+                "--install",
+                "tempo",
+                "grafana/tempo",
+                "--namespace",
+                "observability",
+                "-f",
+                str(tempo_values),
+                "--wait",
+                "--timeout",
+                "3m",
+            ],
+            context=context,
+        )
+
+    mimir_values = obs_dir / "mimir-values.yaml"
+    if mimir_values.exists():
+        typer.echo("Installing Mimir...")
+        _helm(
+            [
+                "upgrade",
+                "--install",
+                "mimir",
+                "grafana/mimir-distributed",
+                "--namespace",
+                "observability",
+                "-f",
+                str(mimir_values),
+                "--wait",
+                "--timeout",
+                "5m",
+            ],
+            context=context,
+        )
+
+    promtail_values = obs_dir / "promtail-values.yaml"
+    if promtail_values.exists():
+        typer.echo("Installing Promtail...")
+        _helm(
+            [
+                "upgrade",
+                "--install",
+                "promtail",
+                "grafana/promtail",
+                "--namespace",
+                "observability",
+                "-f",
+                str(promtail_values),
+                "--wait",
+                "--timeout",
+                "3m",
+            ],
+            context=context,
+        )
+
+    dashboard_file = obs_dir / "dashboards" / "app.json"
+    if dashboard_file.exists():
+        cm_name = "grafana-dashboards"
+        result = _kubectl(
+            ["get", "configmap", cm_name, "-n", "observability"],
+            context=context,
+        )
+        if result.returncode != 0:
+            _kubectl(
+                [
+                    "create",
+                    "configmap",
+                    cm_name,
+                    "-n",
+                    "observability",
+                    f"--from-file=app.json={dashboard_file}",
+                ],
+                context=context,
+            )
+
+    grafana_values = obs_dir / "grafana-values.yaml"
+    if grafana_values.exists():
+        typer.echo("Installing Grafana...")
+        _helm(
+            [
+                "upgrade",
+                "--install",
+                "grafana",
+                "grafana/grafana",
+                "--namespace",
+                "observability",
+                "-f",
+                str(grafana_values),
+                "--wait",
+                "--timeout",
+                "3m",
+            ],
+            context=context,
+        )
+
+    typer.echo("Observability stack installed")
+    typer.echo("  Grafana: http://grafana.localhost (admin/admin)")
+
+
 def install_platform(context: str) -> None:
     install_ingress_nginx(context)
     install_crossplane(context)

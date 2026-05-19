@@ -16,6 +16,7 @@ PLATFORM_MAPPINGS = [
     ("platform/argocd", "deploy/argocd"),
     ("platform/helm/frontend", "deploy/helm/frontend"),
     ("platform/helm/backend", "deploy/helm/backend"),
+    ("platform/observability", "deploy/observability"),
 ]
 
 

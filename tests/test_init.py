@@ -187,3 +187,37 @@ def test_init_rejects_invalid_name(tmp_path: Path, monkeypatch):
         ],
     )
     assert result.exit_code == 1
+
+
+def test_init_react_express(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            "alt-app",
+            "--frontend",
+            "react",
+            "--backend",
+            "express",
+            "--provider",
+            "civo",
+            "--region",
+            "lon1",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    project = tmp_path / "alt-app"
+    assert (project / "apps" / "frontend" / "package.json").exists()
+    assert (project / "apps" / "frontend" / "vite.config.ts").exists()
+    assert (project / "apps" / "frontend" / "src" / "App.tsx").exists()
+    assert (project / "apps" / "backend" / "package.json").exists()
+    assert (project / "apps" / "backend" / "src" / "index.ts").exists()
+    assert (project / "apps" / "backend" / "Dockerfile").exists()
+    assert (project / "deploy" / "helm" / "backend" / "Chart.yaml").exists()
+    assert (project / "infrastructure" / "xrds" / "database.yaml").exists()
+
+    pkg = (project / "apps" / "frontend" / "package.json").read_text()
+    assert "alt-app-frontend" in pkg
+    backend_pkg = (project / "apps" / "backend" / "package.json").read_text()
+    assert "alt-app-backend" in backend_pkg
