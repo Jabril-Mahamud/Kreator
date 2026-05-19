@@ -6,7 +6,7 @@ from kreator.commands.init import init_command
 
 app = typer.Typer(
     name="kreator",
-    help="Scaffold deployment-ready full-stack applications with Kubernetes, Crossplane, and ArgoCD.",
+    help="Scaffold deployment-ready full-stack apps with Kubernetes, Crossplane, and ArgoCD.",
     no_args_is_help=True,
 )
 

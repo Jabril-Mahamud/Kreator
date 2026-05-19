@@ -8,7 +8,6 @@ def render_template_dir(source: Path, output: Path, context: dict) -> None:
     env = Environment(
         loader=FileSystemLoader(str(source)),
         keep_trailing_newline=True,
-        undefined=None,
     )
 
     for src_path in sorted(source.rglob("*")):

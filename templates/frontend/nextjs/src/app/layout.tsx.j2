@@ -1,7 +1,7 @@
-import type { Metadata } from "next";
+{% raw %}import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "{{ name }}",
+  title: "{% endraw %}{{ name }}{% raw %}",
   description: "Full-stack app built with Kreator",
 };
 
@@ -18,3 +18,4 @@ export default function RootLayout({
     </html>
   );
 }
+{% endraw %}

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -12,8 +11,18 @@ def test_init_creates_project(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(
         app,
-        ["init", "my-app", "--frontend", "nextjs", "--backend", "fastapi",
-         "--provider", "civo", "--region", "lon1"],
+        [
+            "init",
+            "my-app",
+            "--frontend",
+            "nextjs",
+            "--backend",
+            "fastapi",
+            "--provider",
+            "civo",
+            "--region",
+            "lon1",
+        ],
     )
     assert result.exit_code == 0, result.output
     project = tmp_path / "my-app"
@@ -24,8 +33,18 @@ def test_init_creates_kreator_yaml(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     runner.invoke(
         app,
-        ["init", "test-proj", "--frontend", "nextjs", "--backend", "fastapi",
-         "--provider", "civo", "--region", "lon1"],
+        [
+            "init",
+            "test-proj",
+            "--frontend",
+            "nextjs",
+            "--backend",
+            "fastapi",
+            "--provider",
+            "civo",
+            "--region",
+            "lon1",
+        ],
     )
     kreator_yaml = tmp_path / "test-proj" / "kreator.yaml"
     assert kreator_yaml.exists()
@@ -37,8 +56,18 @@ def test_init_creates_backend(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     runner.invoke(
         app,
-        ["init", "test-proj", "--frontend", "nextjs", "--backend", "fastapi",
-         "--provider", "civo", "--region", "lon1"],
+        [
+            "init",
+            "test-proj",
+            "--frontend",
+            "nextjs",
+            "--backend",
+            "fastapi",
+            "--provider",
+            "civo",
+            "--region",
+            "lon1",
+        ],
     )
     backend = tmp_path / "test-proj" / "apps" / "backend"
     assert backend.exists()
@@ -57,8 +86,18 @@ def test_init_creates_frontend(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     runner.invoke(
         app,
-        ["init", "test-proj", "--frontend", "nextjs", "--backend", "fastapi",
-         "--provider", "civo", "--region", "lon1"],
+        [
+            "init",
+            "test-proj",
+            "--frontend",
+            "nextjs",
+            "--backend",
+            "fastapi",
+            "--provider",
+            "civo",
+            "--region",
+            "lon1",
+        ],
     )
     frontend = tmp_path / "test-proj" / "apps" / "frontend"
     assert frontend.exists()
@@ -73,8 +112,18 @@ def test_init_creates_project_files(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     runner.invoke(
         app,
-        ["init", "test-proj", "--frontend", "nextjs", "--backend", "fastapi",
-         "--provider", "civo", "--region", "lon1"],
+        [
+            "init",
+            "test-proj",
+            "--frontend",
+            "nextjs",
+            "--backend",
+            "fastapi",
+            "--provider",
+            "civo",
+            "--region",
+            "lon1",
+        ],
     )
     project = tmp_path / "test-proj"
     assert (project / "Makefile").exists()
@@ -86,8 +135,18 @@ def test_init_renders_project_name_in_templates(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     runner.invoke(
         app,
-        ["init", "cool-app", "--frontend", "nextjs", "--backend", "fastapi",
-         "--provider", "civo", "--region", "lon1"],
+        [
+            "init",
+            "cool-app",
+            "--frontend",
+            "nextjs",
+            "--backend",
+            "fastapi",
+            "--provider",
+            "civo",
+            "--region",
+            "lon1",
+        ],
     )
     package_json = (tmp_path / "cool-app" / "apps" / "frontend" / "package.json").read_text()
     assert "cool-app-frontend" in package_json
@@ -101,8 +160,18 @@ def test_init_rejects_existing_directory(tmp_path: Path, monkeypatch):
     (tmp_path / "existing").mkdir()
     result = runner.invoke(
         app,
-        ["init", "existing", "--frontend", "nextjs", "--backend", "fastapi",
-         "--provider", "civo", "--region", "lon1"],
+        [
+            "init",
+            "existing",
+            "--frontend",
+            "nextjs",
+            "--backend",
+            "fastapi",
+            "--provider",
+            "civo",
+            "--region",
+            "lon1",
+        ],
     )
     assert result.exit_code == 1
 
@@ -111,7 +180,17 @@ def test_init_rejects_invalid_name(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     result = runner.invoke(
         app,
-        ["init", "Bad_Name", "--frontend", "nextjs", "--backend", "fastapi",
-         "--provider", "civo", "--region", "lon1"],
+        [
+            "init",
+            "Bad_Name",
+            "--frontend",
+            "nextjs",
+            "--backend",
+            "fastapi",
+            "--provider",
+            "civo",
+            "--region",
+            "lon1",
+        ],
     )
     assert result.exit_code == 1

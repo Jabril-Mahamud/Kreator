@@ -1,4 +1,4 @@
-"use client";
+{% raw %}"use client";
 
 import { useEffect, useState } from "react";
 import { checkHealth, createItem, deleteItem, fetchItems, Item } from "@/lib/api";
@@ -41,7 +41,7 @@ export default function Home() {
 
   return (
     <main>
-      <h1>{{ name }}</h1>
+      <h1>{% endraw %}{{ name }}{% raw %}</h1>
 
       <div style={{ marginBottom: "1rem" }}>
         <span
@@ -116,3 +116,4 @@ export default function Home() {
     </main>
   );
 }
+{% endraw %}
