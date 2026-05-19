@@ -253,12 +253,12 @@ Generated Helm charts follow these conventions:
 **Done when:** `kreator init my-app && cd my-app && kreator dev` produces a running app on Kind, deployed through ArgoCD, with database provisioned by Crossplane.
 
 ### Phase 3: Civo deployment
-- [ ] Civo Crossplane provider setup
-- [ ] Civo Composition: managed Kubernetes cluster + managed database
-- [ ] `kreator deploy` provisions infrastructure on Civo via Crossplane
-- [ ] ArgoCD installed on the Civo cluster, pointed at the git remote
-- [ ] `kreator destroy` tears down Civo resources
-- [ ] Docs for Civo API key setup
+- [x] Civo Crossplane provider setup
+- [x] Civo Composition: managed Kubernetes cluster + managed database
+- [x] `kreator deploy` provisions infrastructure on Civo via Crossplane
+- [x] ArgoCD installed on the Civo cluster, pointed at the git remote
+- [x] `kreator destroy` tears down Civo resources
+- [x] Docs for Civo API key setup
 
 **Done when:** `kreator deploy` provisions a Civo cluster and database, deploys the app via ArgoCD.
 

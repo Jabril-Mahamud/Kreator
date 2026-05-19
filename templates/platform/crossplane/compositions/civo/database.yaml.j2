@@ -1,0 +1,64 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: civo-database
+  labels:
+    crossplane.io/xrd: xdatabases.kreator.dev
+    provider: civo
+spec:
+  compositeTypeRef:
+    apiVersion: kreator.dev/v1alpha1
+    kind: XDatabase
+  resources:
+    - name: civo-database
+      base:
+        apiVersion: database.civo.crossplane.io/v1alpha1
+        kind: DatabaseCluster
+        spec:
+          forProvider:
+            name: ""
+            region: {{ region }}
+            nodes: 1
+            size: g3.db.xsmall
+            engine: PostgreSQL
+            version: "16"
+          providerConfigRef:
+            name: default
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.name
+          toFieldPath: spec.forProvider.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-db"
+                type: Format
+
+    - name: db-connection-secret
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                namespace: default
+              type: Opaque
+              stringData:
+                POSTGRES_USER: ""
+                POSTGRES_PASSWORD: ""
+                POSTGRES_DB: {{ name | replace('-', '_') }}
+                DATABASE_URL: ""
+          providerConfigRef:
+            name: default
+      patches:
+        - type: FromCompositeFieldPath
+          fromFieldPath: spec.parameters.name
+          toFieldPath: spec.forProvider.manifest.metadata.name
+          transforms:
+            - type: string
+              string:
+                fmt: "%s-db-credentials"
+                type: Format
