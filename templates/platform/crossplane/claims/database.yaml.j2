@@ -5,9 +5,9 @@ metadata:
   namespace: default
 spec:
   parameters:
-    name: {{ name }}
-    database: {{ database }}
-    storageSize: 1Gi
+    name: {{ name }}-db
+    namespace: default
+    size: small
   compositionSelector:
     matchLabels:
-      provider: local
+      provider: {{ provider }}

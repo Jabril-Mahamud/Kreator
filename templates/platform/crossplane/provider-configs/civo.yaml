@@ -1,0 +1,11 @@
+apiVersion: civo.crossplane.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: provider-civo
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      name: civo-api-key
+      namespace: crossplane-system
+      key: credentials

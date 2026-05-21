@@ -1,8 +1,18 @@
-import re
 from pathlib import Path
 
-import yaml
 from pydantic import BaseModel, field_validator
+
+TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates"
+
+
+def discover_templates(kind: str) -> list[str]:
+    """Scan templates/<kind>/ and return available template names."""
+    template_dir = TEMPLATES_DIR / kind
+    if not template_dir.is_dir():
+        return []
+    return sorted(
+        d.name for d in template_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
+    )
 
 
 class KreatorConfig(BaseModel):
@@ -16,53 +26,53 @@ class KreatorConfig(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_name(cls, v: str) -> str:
-        if not re.match(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$", v):
+        if not v.isidentifier() and not all(c.isalnum() or c in "-_" for c in v):
             raise ValueError(
-                "name must be lowercase alphanumeric with hyphens only, "
-                "cannot start or end with a hyphen"
+                f"Project name '{v}' must only contain alphanumeric, hyphens, or underscores"
             )
+        if not v:
+            raise ValueError("Project name cannot be empty")
         return v
 
     @field_validator("frontend")
     @classmethod
     def validate_frontend(cls, v: str) -> str:
-        allowed = {"nextjs", "react"}
-        if v not in allowed:
-            raise ValueError(f"frontend must be one of: {', '.join(sorted(allowed))}")
+        available = discover_templates("frontend")
+        if v not in available:
+            raise ValueError(f"Frontend '{v}' not found. Available: {', '.join(available)}")
         return v
 
     @field_validator("backend")
     @classmethod
     def validate_backend(cls, v: str) -> str:
-        allowed = {"fastapi", "express"}
-        if v not in allowed:
-            raise ValueError(f"backend must be one of: {', '.join(sorted(allowed))}")
+        available = discover_templates("backend")
+        if v not in available:
+            raise ValueError(f"Backend '{v}' not found. Available: {', '.join(available)}")
         return v
 
     @field_validator("database")
     @classmethod
     def validate_database(cls, v: str) -> str:
-        allowed = {"postgres"}
-        if v not in allowed:
-            raise ValueError(f"database must be one of: {', '.join(sorted(allowed))}")
+        if v != "postgres":
+            raise ValueError("Only 'postgres' is supported as a database")
         return v
 
     @field_validator("provider")
     @classmethod
     def validate_provider(cls, v: str) -> str:
-        allowed = {"civo", "local"}
-        if v not in allowed:
-            raise ValueError(f"provider must be one of: {', '.join(sorted(allowed))}")
+        if v not in ("civo", "local"):
+            raise ValueError(f"Provider '{v}' not supported. Choose 'civo' or 'local'")
         return v
 
 
 def load_config(path: Path) -> KreatorConfig:
+    """Load and validate a kreator.yaml file."""
+    import yaml
+
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}")
     with open(path) as f:
         data = yaml.safe_load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid config file: {path}")
     return KreatorConfig(**data)
-
-
-def save_config(config: KreatorConfig, path: Path) -> None:
-    data = config.model_dump()
-    with open(path, "w") as f:
-        yaml.dump(data, f, default_flow_style=False, sort_keys=False)

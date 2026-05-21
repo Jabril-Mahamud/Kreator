@@ -1,0 +1,45 @@
+package middleware
+
+import (
+	"context"
+	"net/http"
+	"strings"
+
+	"{{ name }}-backend/internal/auth"
+)
+
+type contextKey string
+
+const UserIDKey contextKey = "user_id"
+
+type AuthMiddleware struct {
+	secret string
+}
+
+func NewAuthMiddleware(secret string) *AuthMiddleware {
+	return &AuthMiddleware{secret: secret}
+}
+
+func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header := r.Header.Get("Authorization")
+		if header == "" || !strings.HasPrefix(header, "Bearer ") {
+			http.Error(w, `{"detail":"Missing or invalid token"}`, http.StatusUnauthorized)
+			return
+		}
+
+		token := strings.TrimPrefix(header, "Bearer ")
+		userID, err := auth.ValidateToken(token, m.secret)
+		if err != nil {
+			http.Error(w, `{"detail":"Invalid token"}`, http.StatusUnauthorized)
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), UserIDKey, userID)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func GetUserID(r *http.Request) string {
+	return r.Context().Value(UserIDKey).(string)
+}

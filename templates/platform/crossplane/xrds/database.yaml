@@ -26,13 +26,12 @@ spec:
                   properties:
                     name:
                       type: string
-                    database:
+                    namespace:
                       type: string
-                      default: postgres
-                    storageSize:
+                      default: default
+                    size:
                       type: string
-                      default: 1Gi
-                  required:
-                    - name
-              required:
-                - parameters
+                      default: small
+                      enum: [small, medium, large]
+                  required: [name]
+              required: [parameters]

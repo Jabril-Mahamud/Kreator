@@ -1,0 +1,95 @@
+package main
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"{{ name }}-backend/internal/database"
+	"{{ name }}-backend/internal/handlers"
+	"{{ name }}-backend/internal/middleware"
+
+	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		dbURL = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "dev-secret-change-me"
+	}
+
+	db, err := database.Connect(context.Background(), dbURL)
+	if err != nil {
+		slog.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	if err := database.Migrate(context.Background(), db); err != nil {
+		slog.Error("failed to run migrations", "error", err)
+		os.Exit(1)
+	}
+
+	authHandler := handlers.NewAuthHandler(db, jwtSecret)
+	todoHandler := handlers.NewTodoHandler(db)
+	healthHandler := handlers.NewHealthHandler(db)
+	authMiddleware := middleware.NewAuthMiddleware(jwtSecret)
+
+	r := chi.NewRouter()
+	r.Use(chimw.Recoverer)
+	r.Use(middleware.CORS)
+
+	r.Get("/healthz", healthHandler.Healthz)
+	r.Get("/readyz", healthHandler.Readyz)
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
+
+	r.Post("/api/auth/register", authHandler.Register)
+	r.Post("/api/auth/login", authHandler.Login)
+
+	r.Route("/api/todos", func(r chi.Router) {
+		r.Use(authMiddleware.Authenticate)
+		r.Get("/", todoHandler.List)
+		r.Post("/", todoHandler.Create)
+		r.Get("/{id}", todoHandler.Get)
+		r.Patch("/{id}", todoHandler.Update)
+		r.Delete("/{id}", todoHandler.Delete)
+	})
+
+	srv := &http.Server{
+		Addr:    ":8000",
+		Handler: r,
+	}
+
+	go func() {
+		slog.Info("server starting", "addr", ":8000")
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			slog.Error("server failed", "error", err)
+			os.Exit(1)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("server shutdown failed", "error", err)
+	}
+	slog.Info("server stopped")
+}

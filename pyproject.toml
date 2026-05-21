@@ -26,6 +26,9 @@ kreator = "kreator.main:app"
 [tool.setuptools.packages.find]
 include = ["kreator*"]
 
+[tool.setuptools.package-data]
+kreator = ["py.typed"]
+
 [tool.ruff]
 target-version = "py312"
 line-length = 100

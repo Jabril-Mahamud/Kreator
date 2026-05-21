@@ -1,9 +1,9 @@
 import typer
 
-from kreator.commands.deploy import deploy_command
-from kreator.commands.destroy import destroy_command
-from kreator.commands.dev import dev_command
-from kreator.commands.init import init_command
+from kreator.commands.deploy import deploy
+from kreator.commands.destroy import destroy
+from kreator.commands.dev import dev
+from kreator.commands.init import init
 
 app = typer.Typer(
     name="kreator",
@@ -11,10 +11,10 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-app.command("init")(init_command)
-app.command("dev")(dev_command)
-app.command("deploy")(deploy_command)
-app.command("destroy")(destroy_command)
+app.command()(init)
+app.command()(dev)
+app.command()(deploy)
+app.command()(destroy)
 
 if __name__ == "__main__":
     app()

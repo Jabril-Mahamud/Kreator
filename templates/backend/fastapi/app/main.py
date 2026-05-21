@@ -1,0 +1,48 @@
+import logging
+import sys
+
+from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.database import engine
+from app.models import Base
+from app.routes import auth, todos, health
+
+logger = logging.getLogger(__name__)
+
+
+def setup_logging() -> None:
+    from pythonjsonlogger.json import JsonFormatter
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(JsonFormatter())
+    logging.root.handlers = [handler]
+    logging.root.setLevel(logging.INFO)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    setup_logging()
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    logger.info("database tables created")
+    yield
+    await engine.dispose()
+
+
+app = FastAPI(title="{{ name }}-backend", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.include_router(auth.router)
+app.include_router(todos.router)
+app.include_router(health.router)

@@ -1,26 +1,30 @@
-# Python
+# Dependencies
+node_modules/
 __pycache__/
 *.pyc
 *.egg-info/
 .venv/
+venv/
+
+# Build output
 dist/
 build/
-
-# Node
-node_modules/
 .next/
+out/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Secrets (plain text, never commit)
+secrets/raw/
 
 # Environment
 .env
 .env.local
 
-# Secrets (raw, unencrypted)
-secrets/raw/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-
-# OS
-.DS_Store
+# Go
+/apps/backend/backend

@@ -20,61 +20,19 @@ spec:
               apiVersion: v1
               kind: Secret
               metadata:
+                name: {{ name }}-db-credentials
                 namespace: default
               type: Opaque
               stringData:
                 POSTGRES_USER: postgres
                 POSTGRES_PASSWORD: postgres
-                POSTGRES_DB: {{ name | replace('-', '_') }}
-                DATABASE_URL: "postgresql+asyncpg://postgres:postgres@{{ name }}-db:5432/{{ name | replace('-', '_') }}"
+                POSTGRES_DB: {{ name }}
+                DATABASE_URL: "postgresql://postgres:postgres@{{ name }}-db:5432/{{ name }}"
           providerConfigRef:
-            name: default
+            name: provider-kubernetes
       patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.parameters.name
-          toFieldPath: spec.forProvider.manifest.metadata.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-db-credentials"
-                type: Format
-
-    - name: postgres-service
-      base:
-        apiVersion: kubernetes.crossplane.io/v1alpha2
-        kind: Object
-        spec:
-          forProvider:
-            manifest:
-              apiVersion: v1
-              kind: Service
-              metadata:
-                namespace: default
-              spec:
-                clusterIP: None
-                ports:
-                  - port: 5432
-                    targetPort: 5432
-                selector: {}
-          providerConfigRef:
-            name: default
-      patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.parameters.name
-          toFieldPath: spec.forProvider.manifest.metadata.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-db"
-                type: Format
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.parameters.name
-          toFieldPath: spec.forProvider.manifest.spec.selector.app
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-db"
-                type: Format
+        - fromFieldPath: spec.parameters.namespace
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
 
     - name: postgres-statefulset
       base:
@@ -86,31 +44,27 @@ spec:
               apiVersion: apps/v1
               kind: StatefulSet
               metadata:
+                name: {{ name }}-db
                 namespace: default
               spec:
+                serviceName: {{ name }}-db
                 replicas: 1
                 selector:
-                  matchLabels: {}
-                serviceName: ""
+                  matchLabels:
+                    app: {{ name }}-db
                 template:
                   metadata:
-                    labels: {}
+                    labels:
+                      app: {{ name }}-db
                   spec:
                     containers:
                       - name: postgres
                         image: postgres:16-alpine
                         ports:
                           - containerPort: 5432
-                        env:
-                          - name: POSTGRES_USER
-                            value: postgres
-                          - name: POSTGRES_PASSWORD
-                            value: postgres
-                          - name: POSTGRES_DB
-                            value: {{ name | replace('-', '_') }}
-                        volumeMounts:
-                          - name: data
-                            mountPath: /var/lib/postgresql/data
+                        envFrom:
+                          - secretRef:
+                              name: {{ name }}-db-credentials
                         resources:
                           requests:
                             cpu: 100m
@@ -120,55 +74,36 @@ spec:
                             memory: 512Mi
                         readinessProbe:
                           exec:
-                            command:
-                              - pg_isready
-                              - -U
-                              - postgres
+                            command: ["pg_isready", "-U", "postgres"]
                           initialDelaySeconds: 5
                           periodSeconds: 5
-                volumeClaimTemplates:
-                  - metadata:
-                      name: data
-                    spec:
-                      accessModes: ["ReadWriteOnce"]
-                      resources:
-                        requests:
-                          storage: 1Gi
           providerConfigRef:
-            name: default
+            name: provider-kubernetes
       patches:
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.parameters.name
-          toFieldPath: spec.forProvider.manifest.metadata.name
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-db"
-                type: Format
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.parameters.name
-          toFieldPath: spec.forProvider.manifest.spec.selector.matchLabels.app
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-db"
-                type: Format
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.parameters.name
-          toFieldPath: spec.forProvider.manifest.spec.serviceName
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-db"
-                type: Format
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.parameters.name
-          toFieldPath: spec.forProvider.manifest.spec.template.metadata.labels.app
-          transforms:
-            - type: string
-              string:
-                fmt: "%s-db"
-                type: Format
-        - type: FromCompositeFieldPath
-          fromFieldPath: spec.parameters.storageSize
-          toFieldPath: spec.forProvider.manifest.spec.volumeClaimTemplates[0].spec.resources.requests.storage
+        - fromFieldPath: spec.parameters.namespace
+          toFieldPath: spec.forProvider.manifest.metadata.namespace
+
+    - name: postgres-service
+      base:
+        apiVersion: kubernetes.crossplane.io/v1alpha2
+        kind: Object
+        spec:
+          forProvider:
+            manifest:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: {{ name }}-db
+                namespace: default
+              spec:
+                selector:
+                  app: {{ name }}-db
+                ports:
+                  - port: 5432
+                    targetPort: 5432
+                clusterIP: None
+          providerConfigRef:
+            name: provider-kubernetes
+      patches:
+        - fromFieldPath: spec.parameters.namespace
+          toFieldPath: spec.forProvider.manifest.metadata.namespace

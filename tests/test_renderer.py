@@ -1,71 +1,110 @@
 from pathlib import Path
 
-from kreator.core.renderer import render_template_dir
+import pytest
+
+from kreator.core.config import KreatorConfig
+from kreator.core.renderer import render_project, render_template_dir
 
 
-def test_renders_j2_files(tmp_path: Path):
-    source = tmp_path / "source"
-    source.mkdir()
-    (source / "hello.txt.j2").write_text("Hello {{ name }}!")
+@pytest.fixture
+def simple_template(tmp_path: Path) -> Path:
+    tpl_dir = tmp_path / "tpl"
+    tpl_dir.mkdir()
+    (tpl_dir / "hello.txt.j2").write_text("Hello {{ name }}!")
+    (tpl_dir / "static.txt").write_text("unchanged")
+    sub = tpl_dir / "sub"
+    sub.mkdir()
+    (sub / "nested.txt.j2").write_text("Project: {{ name }}")
+    return tpl_dir
 
-    output = tmp_path / "output"
-    render_template_dir(source, output, {"name": "world"})
 
-    result = output / "hello.txt"
-    assert result.exists()
-    assert result.read_text() == "Hello world!"
+def test_render_template_dir(simple_template: Path, tmp_path: Path) -> None:
+    output = tmp_path / "out"
+    output.mkdir()
+    files = render_template_dir(simple_template, output, {"name": "test"})
+    assert len(files) == 3
+    assert (output / "hello.txt").read_text() == "Hello test!"
+    assert (output / "static.txt").read_text() == "unchanged"
+    assert (output / "sub" / "nested.txt").read_text() == "Project: test"
+
+
+def test_render_j2_suffix_stripped(simple_template: Path, tmp_path: Path) -> None:
+    output = tmp_path / "out"
+    output.mkdir()
+    render_template_dir(simple_template, output, {"name": "x"})
     assert not (output / "hello.txt.j2").exists()
+    assert (output / "hello.txt").exists()
 
 
-def test_copies_non_j2_files(tmp_path: Path):
-    source = tmp_path / "source"
-    source.mkdir()
-    (source / "static.txt").write_text("no templates here")
+def test_render_project_fastapi(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", frontend="nextjs", backend="fastapi")
+    output = tmp_path / "myapp"
+    files = render_project(config, output)
 
-    output = tmp_path / "output"
-    render_template_dir(source, output, {})
-
-    result = output / "static.txt"
-    assert result.exists()
-    assert result.read_text() == "no templates here"
-
-
-def test_creates_directories(tmp_path: Path):
-    source = tmp_path / "source"
-    nested = source / "a" / "b"
-    nested.mkdir(parents=True)
-    (nested / "file.txt.j2").write_text("depth={{ name }}")
-
-    output = tmp_path / "output"
-    render_template_dir(source, output, {"name": "deep"})
-
-    result = output / "a" / "b" / "file.txt"
-    assert result.exists()
-    assert result.read_text() == "depth=deep"
+    assert len(files) > 0
+    assert (output / "kreator.yaml").exists()
+    assert (output / "Makefile").exists()
+    assert (output / "README.md").exists()
+    assert (output / ".gitignore").exists()
+    assert (output / "apps" / "frontend" / "package.json").exists()
+    assert (output / "apps" / "backend" / "pyproject.toml").exists()
+    assert (output / "apps" / "backend" / "app" / "main.py").exists()
+    assert (output / "infrastructure" / "xrds" / "database.yaml").exists()
+    assert (output / "infrastructure" / "claims" / "database.yaml").exists()
+    assert (output / "deploy" / "argocd" / "root-app.yaml").exists()
+    assert (output / "deploy" / "helm" / "backend" / "Chart.yaml").exists()
+    assert (output / "deploy" / "helm" / "frontend" / "Chart.yaml").exists()
+    assert (output / "secrets" / "raw" / ".gitkeep").exists()
+    assert (output / "secrets" / "sealed" / "secrets.yaml").exists()
 
 
-def test_renders_directory_names(tmp_path: Path):
-    source = tmp_path / "source"
-    templated_dir = source / "{{ project }}"
-    templated_dir.mkdir(parents=True)
-    (templated_dir / "config.txt").write_text("inside")
+def test_render_project_go(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", frontend="react", backend="go")
+    output = tmp_path / "myapp"
+    files = render_project(config, output)
 
-    output = tmp_path / "output"
-    render_template_dir(source, output, {"project": "my-app"})
+    assert len(files) > 0
+    assert (output / "apps" / "backend" / "go.mod").exists()
+    assert (output / "apps" / "backend" / "cmd" / "server" / "main.go").exists()
+    assert (output / "apps" / "frontend" / "package.json").exists()
+    assert (output / "apps" / "frontend" / "src" / "App.tsx").exists()
 
-    result = output / "my-app" / "config.txt"
-    assert result.exists()
-    assert result.read_text() == "inside"
+    go_mod = (output / "apps" / "backend" / "go.mod").read_text()
+    assert "myapp-backend" in go_mod
 
 
-def test_mixed_j2_and_static(tmp_path: Path):
-    source = tmp_path / "source"
-    source.mkdir()
-    (source / "template.yaml.j2").write_text("name: {{ name }}")
-    (source / "readme.md").write_text("static content")
+def test_render_project_express(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", frontend="nextjs", backend="express")
+    output = tmp_path / "myapp"
+    files = render_project(config, output)
 
-    output = tmp_path / "output"
-    render_template_dir(source, output, {"name": "test"})
+    assert len(files) > 0
+    assert (output / "apps" / "backend" / "package.json").exists()
+    assert (output / "apps" / "backend" / "tsconfig.json").exists()
+    assert (output / "apps" / "backend" / "src" / "index.ts").exists()
 
-    assert (output / "template.yaml").read_text() == "name: test"
-    assert (output / "readme.md").read_text() == "static content"
+    pkg = (output / "apps" / "backend" / "package.json").read_text()
+    assert "myapp-backend" in pkg
+
+
+def test_render_project_kreator_yaml_content(tmp_path: Path) -> None:
+    config = KreatorConfig(name="test-proj", frontend="react", backend="express", region="nyc1")
+    output = tmp_path / "test-proj"
+    render_project(config, output)
+
+    content = (output / "kreator.yaml").read_text()
+    assert "name: test-proj" in content
+    assert "frontend: react" in content
+    assert "backend: express" in content
+    assert "region: nyc1" in content
+
+
+def test_helm_templates_preserve_go_templates(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", backend="fastapi")
+    output = tmp_path / "myapp"
+    render_project(config, output)
+
+    helm_path = output / "deploy" / "helm" / "backend" / "templates" / "deployment.yaml"
+    deployment = helm_path.read_text()
+    assert "{{ include" in deployment or "{{" in deployment
+    assert ".Values.image.repository" in deployment

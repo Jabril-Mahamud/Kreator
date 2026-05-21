@@ -6,9 +6,9 @@ metadata:
 spec:
   project: default
   source:
-    path: deploy/helm/frontend
-    repoURL: https://github.com/placeholder/{{ name }}.git
+    repoURL: https://github.com/OWNER/{{ name }}.git
     targetRevision: HEAD
+    path: deploy/helm/frontend
   destination:
     server: https://kubernetes.default.svc
     namespace: default
