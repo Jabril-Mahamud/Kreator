@@ -25,6 +25,9 @@ spec:
           ports:
             - containerPort: 3000
               protocol: TCP
+          env:
+            - name: API_URL
+              value: {{ .Values.apiUrl | quote }}
           livenessProbe:
             httpGet:
               path: /

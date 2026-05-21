@@ -1,6 +1,6 @@
 # Frontend Contract
 
-Any frontend template must implement the following to work with the Kreator platform.
+Any frontend template must implement the following Docker and HTTP interface to work with the Kreator platform (Helm charts, ArgoCD, Crossplane, Sealed Secrets).
 
 ## Screens
 
@@ -10,22 +10,25 @@ Any frontend template must implement the following to work with the Kreator plat
 
 ## Auth
 
-- Store the JWT in React state (not localStorage)
-- Pass it as `Authorization: Bearer <token>` on all /api/todos requests
+- Send `Authorization: Bearer <token>` header on all /api/todos requests
 - Redirect to login when receiving a 401
 
 ## Backend connectivity
 
-- Health indicator dot showing whether the backend is reachable (GET /healthz)
-- Green when connected, red when not
+- Health indicator showing whether the backend is reachable (GET /healthz)
 
 ## Environment variables
 
-- Next.js: `NEXT_PUBLIC_API_URL` (e.g., http://api.localhost)
-- React/Vite: `VITE_API_URL` (e.g., http://api.localhost)
+The Helm chart passes a single generic `API_URL` env var (e.g., `http://api.localhost`). The Dockerfile or entrypoint script is responsible for mapping `API_URL` to whatever the framework expects internally. Examples:
+
+- A Next.js template maps `API_URL` to `NEXT_PUBLIC_API_URL`
+- A Vite template maps `API_URL` to `VITE_API_URL` at build time
+- A Go/HTMX template reads `API_URL` directly
+
+How the mapping happens is internal to the template. The Helm chart does not know or care.
 
 ## Runtime requirements
 
 - Serves on port 3000
 - Multi-stage Dockerfile, runs as UID 1001
-- Static build output where possible
+- Accepts `API_URL` as the only required environment variable
