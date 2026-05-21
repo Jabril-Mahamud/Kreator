@@ -14,6 +14,7 @@ PLATFORM_DIR_MAP: dict[str, str] = {
     "argocd": "deploy/argocd",
     "sealed-secrets": "secrets/sealed",
     "ingress": "deploy/ingress",
+    "observability": "deploy/observability",
 }
 
 

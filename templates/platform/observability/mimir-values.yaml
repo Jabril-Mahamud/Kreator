@@ -1,0 +1,8 @@
+mimir:
+  structuredConfig:
+    common:
+      storage:
+        backend: filesystem
+
+minio:
+  enabled: false

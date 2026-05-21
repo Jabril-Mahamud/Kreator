@@ -1,0 +1,29 @@
+adminPassword: admin
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        url: http://mimir-query-frontend:8080/prometheus
+        isDefault: true
+      - name: Loki
+        type: loki
+        url: http://loki:3100
+      - name: Tempo
+        type: tempo
+        url: http://tempo:3100
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: default
+        folder: ""
+        type: file
+        options:
+          path: /var/lib/grafana/dashboards/default
+
+dashboardsConfigMaps:
+  default: {{ name }}-grafana-dashboards
