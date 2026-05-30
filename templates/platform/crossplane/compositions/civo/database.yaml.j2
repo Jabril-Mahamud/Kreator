@@ -23,6 +23,28 @@ spec:
             engine: PostgreSQL
           providerConfigRef:
             name: provider-civo
+          writeConnectionSecretToRef:
+            name: {{ name }}-db-conn
+            namespace: crossplane-system
       patches:
         - fromFieldPath: spec.parameters.name
           toFieldPath: spec.forProvider.name
+        - fromFieldPath: spec.parameters.name
+          toFieldPath: metadata.annotations[crossplane.io/external-name]
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.parameters.name
+            strategy: string
+            string:
+              fmt: "%s-conn"
+          toFieldPath: spec.writeConnectionSecretToRef.name
+      connectionDetails:
+        - name: host
+          fromConnectionSecretKey: host
+        - name: port
+          fromConnectionSecretKey: port
+        - name: username
+          fromConnectionSecretKey: username
+        - name: password
+          fromConnectionSecretKey: password

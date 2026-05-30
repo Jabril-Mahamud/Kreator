@@ -10,6 +10,11 @@ spec:
   claimNames:
     kind: Database
     plural: databases
+  connectionSecretKeys:
+    - host
+    - port
+    - username
+    - password
   versions:
     - name: v1alpha1
       served: true

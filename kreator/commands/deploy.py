@@ -14,6 +14,7 @@ from kreator.core.platform import (
 )
 from kreator.providers.civo import (
     apply_civo_manifests,
+    create_app_secrets,
     install_crossplane_provider_civo,
     setup_civo_api_key_secret,
     wait_for_claims_ready,
@@ -60,25 +61,28 @@ def deploy(
 
     typer.echo(f"Deploying '{config.name}' to Civo ({config.region})...")
 
-    typer.echo("\n[1/6] Installing Crossplane...")
+    typer.echo("\n[1/7] Installing Crossplane...")
     install_crossplane()
 
-    typer.echo("[2/6] Setting up Civo provider...")
+    typer.echo("[2/7] Setting up Civo provider...")
     setup_civo_api_key_secret(civo_api_key)
     install_crossplane_provider_civo()
 
-    typer.echo("[3/6] Installing platform components...")
+    typer.echo("[3/7] Installing platform components...")
     install_ingress_nginx()
     install_sealed_secrets()
     install_argocd()
 
-    typer.echo("[4/6] Applying Civo infrastructure...")
+    typer.echo("[4/7] Applying Civo infrastructure...")
     apply_civo_manifests(project_dir)
 
-    typer.echo("[5/6] Waiting for infrastructure to provision...")
+    typer.echo("[5/7] Waiting for infrastructure to provision...")
     wait_for_claims_ready(project_dir)
 
-    typer.echo("[6/6] Installing application via Helm...")
+    typer.echo("[6/7] Creating application secrets from database credentials...")
+    create_app_secrets(config.name)
+
+    typer.echo("[7/7] Installing application via Helm...")
     install_helm_releases(project_dir)
 
     typer.echo("\nDeployment complete!")

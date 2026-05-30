@@ -21,6 +21,7 @@ def test_init_default(run_in_tmp: Path) -> None:
     assert (run_in_tmp / "my-app" / "kreator.yaml").exists()
     assert (run_in_tmp / "my-app" / "apps" / "frontend").exists()
     assert (run_in_tmp / "my-app" / "apps" / "backend").exists()
+    assert (run_in_tmp / "my-app" / ".git").is_dir()
 
 
 def test_init_fastapi(run_in_tmp: Path) -> None:

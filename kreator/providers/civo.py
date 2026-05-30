@@ -155,6 +155,65 @@ def wait_for_claims_ready(project_dir: Path, timeout: int = 600) -> None:
     raise RuntimeError(f"Claims not ready after {timeout}s")
 
 
+def create_app_secrets(config_name: str) -> None:
+    """Read Civo database connection details and create the app secrets."""
+    import base64
+    import json
+    import secrets
+
+    conn_secret_name = f"{config_name}-db-conn"
+    result = _run(
+        [
+            "kubectl",
+            "get",
+            "secret",
+            conn_secret_name,
+            "-n",
+            "crossplane-system",
+            "-o",
+            "jsonpath={.data}",
+        ],
+        capture=True,
+        check=False,
+    )
+
+    jwt_secret = secrets.token_urlsafe(32)
+
+    if result.returncode == 0 and result.stdout.strip():
+        data = json.loads(result.stdout)
+        host = base64.b64decode(data.get("host", "")).decode()
+        port = base64.b64decode(data.get("port", "")).decode() or "5432"
+        username = base64.b64decode(data.get("username", "")).decode() or "postgres"
+        password = base64.b64decode(data.get("password", "")).decode()
+        database_url = f"postgresql://{username}:{password}@{host}:{port}/{config_name}"
+        logger.info("constructed database url from civo connection secret")
+    else:
+        logger.warning(
+            "could not read connection secret %s, using placeholder database url",
+            conn_secret_name,
+        )
+        database_url = f"postgresql://postgres:postgres@{config_name}-db:5432/{config_name}"
+
+    _run(
+        ["kubectl", "delete", "secret", f"{config_name}-app-secrets", "-n", "default"],
+        check=False,
+    )
+    _run(
+        [
+            "kubectl",
+            "create",
+            "secret",
+            "generic",
+            f"{config_name}-app-secrets",
+            f"--from-literal=DATABASE_URL={database_url}",
+            f"--from-literal=JWT_SECRET={jwt_secret}",
+            "-n",
+            "default",
+        ]
+    )
+    logger.info("app secrets created for %s", config_name)
+
+
 def delete_civo_resources(project_dir: Path) -> None:
     """Delete Crossplane claims and compositions for Civo."""
     infra_dir = project_dir / "infrastructure"

@@ -19,6 +19,23 @@ def _run(cmd: list[str], check: bool = True, capture: bool = False) -> subproces
         raise RuntimeError(f"Command not found: {cmd[0]}. Is it installed and on your PATH?")
 
 
+def _port_has_registry() -> bool:
+    """Check if any container is already serving a registry on REGISTRY_PORT."""
+    result = _run(
+        [
+            "docker",
+            "ps",
+            "--filter",
+            f"publish={REGISTRY_PORT}",
+            "--format",
+            "{{.Names}}",
+        ],
+        capture=True,
+        check=False,
+    )
+    return bool(result.stdout.strip())
+
+
 def registry_running() -> bool:
     result = _run(
         ["docker", "inspect", "-f", "{{.State.Running}}", REGISTRY_NAME],
@@ -33,11 +50,23 @@ def start_registry() -> None:
         logger.info("registry already running on port %d", REGISTRY_PORT)
         return
 
+    if _port_has_registry():
+        logger.info("existing registry found on port %d, reusing it", REGISTRY_PORT)
+        return
+
     result = _run(
-        ["docker", "ps", "-a", "--filter", f"name={REGISTRY_NAME}", "--format", "{{.Names}}"],
+        [
+            "docker",
+            "ps",
+            "-a",
+            "--filter",
+            f"name=^/{REGISTRY_NAME}$",
+            "--format",
+            "{{.Names}}",
+        ],
         capture=True,
     )
-    if REGISTRY_NAME in result.stdout:
+    if REGISTRY_NAME in result.stdout.split():
         _run(["docker", "start", REGISTRY_NAME])
     else:
         _run(

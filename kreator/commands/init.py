@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import typer
@@ -12,6 +13,7 @@ def init(
     backend: str = typer.Option("fastapi", help="Backend template"),
     provider: str = typer.Option("civo", help="Cloud provider (civo or local)"),
     region: str = typer.Option("lon1", help="Provider region"),
+    repo_url: str = typer.Option("", "--repo-url", help="Git repo URL for ArgoCD sync"),
 ) -> None:
     """Scaffold a new project."""
     available_frontends = discover_templates("frontend")
@@ -43,10 +45,13 @@ def init(
         backend=backend,
         provider=provider,
         region=region,
+        repo_url=repo_url,
     )
 
     output_dir.mkdir(parents=True)
     files = render_project(config, output_dir)
+
+    _git_init(output_dir)
 
     typer.echo(f"Created project '{name}' with {len(files)} files")
     typer.echo(f"  frontend: {frontend}")
@@ -56,3 +61,20 @@ def init(
     typer.echo("\nNext steps:")
     typer.echo(f"  cd {name}")
     typer.echo("  kreator dev")
+
+
+def _git_init(project_dir: Path) -> None:
+    try:
+        subprocess.run(["git", "init"], cwd=project_dir, check=True, capture_output=True, text=True)
+        subprocess.run(
+            ["git", "add", "."], cwd=project_dir, check=True, capture_output=True, text=True
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "initial commit"],
+            cwd=project_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        pass

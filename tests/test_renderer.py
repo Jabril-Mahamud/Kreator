@@ -97,6 +97,33 @@ def test_render_project_kreator_yaml_content(tmp_path: Path) -> None:
     assert "frontend: react" in content
     assert "backend: express" in content
     assert "region: nyc1" in content
+    assert "repo_url:" in content
+
+
+def test_render_project_jwt_secret_generated(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", backend="fastapi")
+    output = tmp_path / "myapp"
+    render_project(config, output)
+
+    secrets_path = output / "secrets" / "sealed" / "secrets.yaml"
+    content = secrets_path.read_text()
+    assert "REPLACE_ME" not in content
+    assert "JWT_SECRET:" in content
+    assert len(content.split("JWT_SECRET:")[1].strip().strip('"')) > 20
+
+
+def test_render_project_repo_url_in_argocd(tmp_path: Path) -> None:
+    config = KreatorConfig(
+        name="myapp",
+        backend="fastapi",
+        repo_url="https://github.com/me/myapp.git",
+    )
+    output = tmp_path / "myapp"
+    render_project(config, output)
+
+    root_app = (output / "deploy" / "argocd" / "root-app.yaml").read_text()
+    assert "https://github.com/me/myapp.git" in root_app
+    assert "OWNER" not in root_app
 
 
 def test_helm_templates_preserve_go_templates(tmp_path: Path) -> None:

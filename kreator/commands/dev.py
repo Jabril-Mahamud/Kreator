@@ -89,8 +89,8 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
         _install_observability()
 
     typer.echo("\nLocal dev environment ready!")
-    typer.echo("  Frontend: http://frontend.localhost")
-    typer.echo("  Backend:  http://api.localhost")
+    typer.echo("  Frontend: http://frontend.localhost:9080")
+    typer.echo("  Backend:  http://api.localhost:9080")
     typer.echo("\nTo tear down: kreator dev --destroy")
 
 

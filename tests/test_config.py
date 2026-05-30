@@ -30,6 +30,12 @@ def test_valid_config() -> None:
     assert config.database == "postgres"
     assert config.provider == "civo"
     assert config.region == "lon1"
+    assert config.repo_url == ""
+
+
+def test_config_with_repo_url() -> None:
+    config = KreatorConfig(name="my-app", repo_url="https://github.com/me/my-app.git")
+    assert config.repo_url == "https://github.com/me/my-app.git"
 
 
 def test_all_backend_options() -> None:

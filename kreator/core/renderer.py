@@ -96,6 +96,8 @@ def render_platform(output_dir: Path, context: dict) -> list[Path]:
 
 def render_project(config: KreatorConfig, output_dir: Path) -> list[Path]:
     """Render the full project from templates into output_dir."""
+    import secrets as _secrets
+
     context = {
         "name": config.name,
         "frontend": config.frontend,
@@ -103,6 +105,8 @@ def render_project(config: KreatorConfig, output_dir: Path) -> list[Path]:
         "database": config.database,
         "provider": config.provider,
         "region": config.region,
+        "repo_url": config.repo_url or f"https://github.com/OWNER/{config.name}.git",
+        "jwt_secret": _secrets.token_urlsafe(32),
     }
 
     created: list[Path] = []

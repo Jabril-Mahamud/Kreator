@@ -22,6 +22,7 @@ class KreatorConfig(BaseModel):
     database: str = "postgres"
     provider: str = "civo"
     region: str = "lon1"
+    repo_url: str = ""
 
     @field_validator("name")
     @classmethod

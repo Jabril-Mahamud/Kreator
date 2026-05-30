@@ -55,8 +55,8 @@ def create_cluster() -> None:
                     '    node-labels: "ingress-ready=true"\n',
                 ],
                 "extraPortMappings": [
-                    {"containerPort": 80, "hostPort": 80, "protocol": "TCP"},
-                    {"containerPort": 443, "hostPort": 443, "protocol": "TCP"},
+                    {"containerPort": 80, "hostPort": 9080, "protocol": "TCP"},
+                    {"containerPort": 443, "hostPort": 9443, "protocol": "TCP"},
                 ],
             },
             {"role": "worker"},
