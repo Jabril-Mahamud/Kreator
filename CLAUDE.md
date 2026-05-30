@@ -62,20 +62,16 @@ my-app/
   Makefile                      # Convenience targets wrapping kreator commands
   README.md                     # Generated docs for this specific project
   apps/
-    frontend/                   # Next.js app (from template)
+    frontend/                   # Next.js or React app (from template)
       src/
       Dockerfile
       package.json
       ...
-    backend/                    # FastAPI app (from template)
-      app/
-      Dockerfile
-      pyproject.toml
-      alembic/
+    backend/                    # FastAPI, Express, or Go app (from template)
       ...
   infrastructure/
     xrds/                       # Crossplane XRD definitions
-      database.yaml             # XBPDatabase (or XKreatorDatabase) CRD
+      database.yaml
     compositions/
       local/                    # Kind: postgres StatefulSet + Service + Secret
         database.yaml
@@ -102,7 +98,9 @@ my-app/
         Chart.yaml
         values.yaml
         templates/
-    observability/              # LGTM values files (optional addon)
+    ingress/
+      ingress-nginx-values.yaml
+    observability/              # LGTM values files
       grafana-values.yaml
       loki-values.yaml
       tempo-values.yaml
@@ -111,20 +109,21 @@ my-app/
       dashboards/
         app.json
   secrets/
-    raw/                        # Gitignored plain secrets
-    sealed/                     # Encrypted SealedSecrets (safe to commit)
-  .gitignore
+    raw/                        # Gitignored plain secrets (.gitkeep)
+    sealed/                     # Sealed Secrets YAML
+      secrets.yaml
 ```
 
 ## kreator.yaml spec
 
 ```yaml
 name: my-app
-frontend: nextjs          # Template name from templates/frontend/
-backend: fastapi          # Template name from templates/backend/
+frontend: nextjs          # nextjs | react
+backend: fastapi          # fastapi | express | go
 database: postgres        # Only postgres for now
 provider: civo            # civo | local (local is implicit for kreator dev)
 region: lon1              # Provider-specific
+repo_url: ""              # Git repo URL for ArgoCD sync (defaults to github.com/OWNER/<name>)
 ```
 
 ## CLI repo structure
@@ -145,16 +144,17 @@ kreator/
       platform.py               # Install platform components into a cluster
       cluster.py                # Kind cluster lifecycle
       registry.py               # Local docker registry
+      observability.py          # LGTM stack installer
     providers/
-      base.py                   # Abstract provider interface
-      local.py                  # Kind + local registry + Kubernetes Crossplane provider
-      civo.py                   # Civo Crossplane provider setup
+      civo.py                   # Civo Crossplane provider setup + resource management
   templates/
     frontend/
       nextjs/                   # Jinja2-templated Next.js app
-        {{cookiecutter.name}}/   # Or just use simple Jinja2 file-by-file
+      react/                    # Jinja2-templated React/Vite app
     backend/
       fastapi/                  # Jinja2-templated FastAPI app
+      express/                  # Jinja2-templated Express/TypeScript app
+      go/                       # Jinja2-templated Go app
     platform/                   # Shared platform templates
       argocd/
       crossplane/
@@ -162,6 +162,8 @@ kreator/
         compositions/
           local/
           civo/
+        provider-configs/
+        claims/
       helm/
         frontend/
         backend/
@@ -262,14 +264,16 @@ Generated Helm charts follow these conventions:
 
 **Done when:** `kreator deploy` provisions a Civo cluster and database, deploys the app via ArgoCD.
 
-### Phase 4: Observability + second template
+### Phase 4: Observability + additional templates
 - [x] LGTM stack as opt-in addon (`kreator dev --with-observability`)
 - [x] Grafana dashboard template
 - [x] Pre-configured datasources (Loki, Tempo, Mimir)
-- [x] Second frontend template (e.g. React/Vite) or second backend template (e.g. Express)
+- [x] React/Vite frontend template
+- [x] Express/TypeScript backend template
+- [x] Go backend template
 - [x] Verify interchangeability: `kreator init --frontend react --backend express` works end to end
 
-**Done when:** Observability works as an addon, two stack combinations are supported.
+**Done when:** Observability works as an addon, multiple stack combinations are supported.
 
 ## Common commands during development
 
