@@ -283,37 +283,22 @@ def setup_argocd_apps(project_dir: Path) -> None:
 
 
 def install_helm_releases(project_dir: Path) -> None:
-    """Install frontend and backend helm charts directly."""
+    """Install all helm charts found in deploy/helm/."""
     helm_dir = project_dir / "deploy" / "helm"
+    if not helm_dir.is_dir():
+        return
 
-    backend_chart = helm_dir / "backend"
-    if backend_chart.is_dir():
-        logger.info("installing backend helm chart")
+    for chart_dir in sorted(helm_dir.iterdir()):
+        if not chart_dir.is_dir():
+            continue
+        logger.info("installing %s helm chart", chart_dir.name)
         _run(
             [
                 "helm",
                 "upgrade",
                 "--install",
-                "backend",
-                str(backend_chart),
-                "--namespace",
-                "default",
-                "--wait",
-                "--timeout",
-                "3m",
-            ]
-        )
-
-    frontend_chart = helm_dir / "frontend"
-    if frontend_chart.is_dir():
-        logger.info("installing frontend helm chart")
-        _run(
-            [
-                "helm",
-                "upgrade",
-                "--install",
-                "frontend",
-                str(frontend_chart),
+                chart_dir.name,
+                str(chart_dir),
                 "--namespace",
                 "default",
                 "--wait",

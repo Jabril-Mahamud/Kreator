@@ -76,7 +76,8 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
 
     typer.echo("[4/6] Building and pushing images...")
     build_and_push(f"{config.name}-backend", str(project_dir / "apps" / "backend"))
-    build_and_push(f"{config.name}-frontend", str(project_dir / "apps" / "frontend"))
+    for fe in config.web_frontends:
+        build_and_push(f"{config.name}-{fe.name}", str(project_dir / "apps" / fe.name))
 
     typer.echo("[5/6] Applying infrastructure (XRDs, compositions, claims, secrets)...")
     apply_manifests(project_dir)
@@ -89,8 +90,16 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
         _install_observability()
 
     typer.echo("\nLocal dev environment ready!")
-    typer.echo("  Frontend: http://frontend.localhost:9080")
+    for fe in config.web_frontends:
+        typer.echo(f"  {fe.name}: http://{fe.name}.localhost:9080")
     typer.echo("  Backend:  http://api.localhost:9080")
+
+    for fe in config.mobile_frontends:
+        typer.echo(
+            f"\n  Mobile app '{fe.name}' is not deployed locally."
+            f"\n  Run: cd apps/{fe.name} && npx expo start"
+        )
+
     typer.echo("\nTo tear down: kreator dev --destroy")
 
 

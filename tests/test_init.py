@@ -104,9 +104,63 @@ def test_init_all_combinations(run_in_tmp: Path) -> None:
         ("react", "fastapi"),
         ("react", "go"),
         ("react", "express"),
+        ("expo", "fastapi"),
+        ("expo", "go"),
+        ("expo", "express"),
     ]
     for frontend, backend in combos:
         name = f"app-{frontend}-{backend}"
         result = runner.invoke(app, ["init", name, "--frontend", frontend, "--backend", backend])
         assert result.exit_code == 0, f"Failed for {frontend}/{backend}: {result.output}"
         assert (run_in_tmp / name / "kreator.yaml").exists()
+
+
+def test_init_multi_frontend(run_in_tmp: Path) -> None:
+    result = runner.invoke(
+        app, ["init", "my-app", "--frontend", "web:nextjs", "--frontend", "mobile:expo"]
+    )
+    assert result.exit_code == 0
+    base = run_in_tmp / "my-app"
+
+    assert (base / "apps" / "web").exists()
+    assert (base / "apps" / "mobile").exists()
+    assert not (base / "apps" / "frontend").exists()
+
+    assert (base / "deploy" / "helm" / "web" / "Chart.yaml").exists()
+    assert not (base / "deploy" / "helm" / "mobile").exists()
+
+    assert (base / "deploy" / "argocd" / "apps" / "web.yaml").exists()
+    assert not (base / "deploy" / "argocd" / "apps" / "mobile.yaml").exists()
+
+    assert (base / ".github" / "workflows" / "mobile-mobile.yml").exists()
+
+    assert "web (nextjs, web)" in result.output
+    assert "mobile (expo, mobile)" in result.output
+
+
+def test_init_multi_frontend_two_web(run_in_tmp: Path) -> None:
+    result = runner.invoke(
+        app, ["init", "my-app", "--frontend", "web:nextjs", "--frontend", "admin:react"]
+    )
+    assert result.exit_code == 0
+    base = run_in_tmp / "my-app"
+
+    assert (base / "apps" / "web").exists()
+    assert (base / "apps" / "admin").exists()
+    assert (base / "deploy" / "helm" / "web" / "Chart.yaml").exists()
+    assert (base / "deploy" / "helm" / "admin" / "Chart.yaml").exists()
+    assert (base / "deploy" / "argocd" / "apps" / "web.yaml").exists()
+    assert (base / "deploy" / "argocd" / "apps" / "admin.yaml").exists()
+
+
+def test_init_expo_frontend(run_in_tmp: Path) -> None:
+    result = runner.invoke(app, ["init", "my-app", "--frontend", "expo"])
+    assert result.exit_code == 0
+    base = run_in_tmp / "my-app"
+
+    assert (base / "apps" / "frontend" / "package.json").exists()
+    assert (base / "apps" / "frontend" / "app.json").exists()
+    assert (base / "apps" / "frontend" / "eas.json").exists()
+    assert (base / "apps" / "frontend" / "src" / "app" / "_layout.tsx").exists()
+
+    assert not (base / "deploy" / "helm" / "frontend").exists()

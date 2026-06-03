@@ -1,8 +1,15 @@
+import re
 from pathlib import Path
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates"
+
+TEMPLATE_PLATFORMS: dict[str, str] = {
+    "nextjs": "web",
+    "react": "web",
+    "expo": "mobile",
+}
 
 
 def discover_templates(kind: str) -> list[str]:
@@ -15,9 +22,25 @@ def discover_templates(kind: str) -> list[str]:
     )
 
 
+class FrontendSpec(BaseModel):
+    name: str
+    template: str
+    platform: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        if not re.match(r"^[a-z0-9][a-z0-9-]*$", v):
+            raise ValueError(f"Frontend name '{v}' must be lowercase alphanumeric with hyphens")
+        if v == "backend":
+            raise ValueError("Frontend name cannot be 'backend'")
+        return v
+
+
 class KreatorConfig(BaseModel):
     name: str
-    frontend: str = "nextjs"
+    frontend: str | None = "nextjs"
+    frontends: list[FrontendSpec] | None = None
     backend: str = "fastapi"
     database: str = "postgres"
     provider: str = "civo"
@@ -35,13 +58,35 @@ class KreatorConfig(BaseModel):
             raise ValueError("Project name cannot be empty")
         return v
 
-    @field_validator("frontend")
-    @classmethod
-    def validate_frontend(cls, v: str) -> str:
+    @model_validator(mode="after")
+    def normalize_frontends(self) -> "KreatorConfig":
         available = discover_templates("frontend")
-        if v not in available:
-            raise ValueError(f"Frontend '{v}' not found. Available: {', '.join(available)}")
-        return v
+
+        if self.frontends:
+            for fe in self.frontends:
+                if fe.template not in available:
+                    raise ValueError(
+                        f"Frontend template '{fe.template}' not found. "
+                        f"Available: {', '.join(available)}"
+                    )
+                if not fe.platform:
+                    fe.platform = TEMPLATE_PLATFORMS.get(fe.template, "web")
+
+            names = [fe.name for fe in self.frontends]
+            if len(names) != len(set(names)):
+                raise ValueError("Frontend names must be unique")
+
+            self.frontend = None
+        else:
+            template = self.frontend or "nextjs"
+            if template not in available:
+                raise ValueError(
+                    f"Frontend '{template}' not found. Available: {', '.join(available)}"
+                )
+            platform = TEMPLATE_PLATFORMS.get(template, "web")
+            self.frontends = [FrontendSpec(name="frontend", template=template, platform=platform)]
+
+        return self
 
     @field_validator("backend")
     @classmethod
@@ -64,6 +109,14 @@ class KreatorConfig(BaseModel):
         if v not in ("civo", "local"):
             raise ValueError(f"Provider '{v}' not supported. Choose 'civo' or 'local'")
         return v
+
+    @property
+    def web_frontends(self) -> list[FrontendSpec]:
+        return [fe for fe in (self.frontends or []) if fe.platform == "web"]
+
+    @property
+    def mobile_frontends(self) -> list[FrontendSpec]:
+        return [fe for fe in (self.frontends or []) if fe.platform == "mobile"]
 
 
 def load_config(path: Path) -> KreatorConfig:

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from kreator.core.config import KreatorConfig
+from kreator.core.config import FrontendSpec, KreatorConfig
 from kreator.core.renderer import render_project, render_template_dir
 
 
@@ -34,6 +34,18 @@ def test_render_j2_suffix_stripped(simple_template: Path, tmp_path: Path) -> Non
     render_template_dir(simple_template, output, {"name": "x"})
     assert not (output / "hello.txt.j2").exists()
     assert (output / "hello.txt").exists()
+
+
+def test_render_template_dir_dynamic_filename(tmp_path: Path) -> None:
+    tpl_dir = tmp_path / "tpl"
+    tpl_dir.mkdir()
+    (tpl_dir / "{{ app_name }}.txt.j2").write_text("content for {{ app_name }}")
+    output = tmp_path / "out"
+    output.mkdir()
+    files = render_template_dir(tpl_dir, output, {"app_name": "mobile"})
+    assert len(files) == 1
+    assert (output / "mobile.txt").exists()
+    assert (output / "mobile.txt").read_text() == "content for mobile"
 
 
 def test_render_project_fastapi(tmp_path: Path) -> None:
@@ -135,3 +147,98 @@ def test_helm_templates_preserve_go_templates(tmp_path: Path) -> None:
     deployment = helm_path.read_text()
     assert "{{ include" in deployment or "{{" in deployment
     assert ".Values.image.repository" in deployment
+
+
+def test_render_project_multi_frontend(tmp_path: Path) -> None:
+    config = KreatorConfig(
+        name="myapp",
+        frontend=None,
+        frontends=[
+            FrontendSpec(name="web", template="nextjs"),
+            FrontendSpec(name="mobile", template="expo"),
+        ],
+        backend="fastapi",
+    )
+    output = tmp_path / "myapp"
+    files = render_project(config, output)
+
+    assert len(files) > 0
+
+    assert (output / "apps" / "web" / "package.json").exists()
+    assert (output / "apps" / "web" / "next.config.js").exists()
+
+    assert (output / "apps" / "mobile" / "package.json").exists()
+    assert (output / "apps" / "mobile" / "app.json").exists()
+    assert (output / "apps" / "mobile" / "eas.json").exists()
+
+    assert (output / "deploy" / "helm" / "web" / "Chart.yaml").exists()
+    web_chart = (output / "deploy" / "helm" / "web" / "Chart.yaml").read_text()
+    assert "myapp-web" in web_chart
+
+    assert not (output / "deploy" / "helm" / "mobile").exists()
+
+    assert (output / "deploy" / "argocd" / "apps" / "web.yaml").exists()
+    web_argocd = (output / "deploy" / "argocd" / "apps" / "web.yaml").read_text()
+    assert "myapp-web" in web_argocd
+    assert "deploy/helm/web" in web_argocd
+
+    assert not (output / "deploy" / "argocd" / "apps" / "mobile.yaml").exists()
+
+    assert (output / ".github" / "workflows" / "mobile-mobile.yml").exists()
+
+
+def test_render_project_multi_frontend_kreator_yaml(tmp_path: Path) -> None:
+    config = KreatorConfig(
+        name="myapp",
+        frontend=None,
+        frontends=[
+            FrontendSpec(name="web", template="nextjs"),
+            FrontendSpec(name="admin", template="react"),
+        ],
+        backend="fastapi",
+    )
+    output = tmp_path / "myapp"
+    render_project(config, output)
+
+    content = (output / "kreator.yaml").read_text()
+    assert "frontends:" in content
+    assert "name: web" in content
+    assert "template: nextjs" in content
+    assert "name: admin" in content
+    assert "template: react" in content
+
+
+def test_render_project_single_frontend_kreator_yaml_compat(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", frontend="nextjs", backend="fastapi")
+    output = tmp_path / "myapp"
+    render_project(config, output)
+
+    content = (output / "kreator.yaml").read_text()
+    assert "frontend: nextjs" in content
+    assert "frontends:" not in content
+
+
+def test_render_project_expo_only(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", frontend="expo", backend="fastapi")
+    output = tmp_path / "myapp"
+    files = render_project(config, output)
+
+    assert len(files) > 0
+    assert (output / "apps" / "frontend" / "package.json").exists()
+    assert (output / "apps" / "frontend" / "app.json").exists()
+    assert (output / "apps" / "frontend" / "eas.json").exists()
+    assert (output / "apps" / "frontend" / "src" / "app" / "_layout.tsx").exists()
+    assert (output / "apps" / "frontend" / "src" / "components" / "LoginScreen.tsx").exists()
+
+    assert not (output / "deploy" / "helm" / "frontend").exists()
+    assert not (output / "deploy" / "argocd" / "apps" / "frontend.yaml").exists()
+
+
+def test_render_project_helm_values_parameterized(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", frontend="nextjs", backend="fastapi")
+    output = tmp_path / "myapp"
+    render_project(config, output)
+
+    values = (output / "deploy" / "helm" / "frontend" / "values.yaml").read_text()
+    assert "localhost:5001/myapp-frontend" in values
+    assert "frontend.localhost" in values

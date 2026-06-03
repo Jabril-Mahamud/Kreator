@@ -1,0 +1,48 @@
+name: Build {{ frontend_name }}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/{{ frontend_name }}/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/{{ frontend_name }}/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/{{ frontend_name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/{{ frontend_name }}/package-lock.json
+
+      - run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: {% raw %}${{ secrets.EXPO_TOKEN }}{% endraw %}
+
+      - name: Build (preview)
+        if: github.event_name == 'pull_request'
+        run: eas build --platform all --profile preview --non-interactive
+
+      - name: Build (production)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: eas build --platform all --profile production --non-interactive
+
+      # Uncomment after configuring app store credentials in EAS:
+      # - name: Submit to stores
+      #   if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      #   run: eas submit --platform all --profile production --non-interactive

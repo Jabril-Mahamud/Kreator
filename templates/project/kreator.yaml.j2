@@ -1,5 +1,13 @@
 name: {{ name }}
-frontend: {{ frontend }}
+{% if frontends | length == 1 and frontends[0].name == "frontend" %}
+frontend: {{ frontends[0].template }}
+{% else %}
+frontends:
+{% for fe in frontends %}
+  - name: {{ fe.name }}
+    template: {{ fe.template }}
+{% endfor %}
+{% endif %}
 backend: {{ backend }}
 database: {{ database }}
 provider: {{ provider }}
