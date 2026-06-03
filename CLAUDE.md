@@ -35,14 +35,15 @@ These decisions are final. Do not revisit or suggest alternatives.
 
 4. **Local dev mirrors production.** `kreator dev` runs the same Crossplane + ArgoCD pipeline on Kind that `kreator deploy` runs on Civo. The only difference is which Crossplane Compositions are active.
 
-5. **Interchangeable app stacks via templates.** Starting with Next.js (frontend) and FastAPI (backend). Templates are Jinja2-rendered. Adding a new stack means adding a new template directory, nothing else changes.
+5. **Interchangeable app stacks via templates.** Starting with Next.js (frontend) and FastAPI (backend). Templates are Jinja2-rendered. Adding a new stack means adding a new template directory, nothing else changes. Projects can have multiple frontends (e.g. web + mobile), each from a different template.
 
 6. **Default cloud provider is Civo.** AWS support comes later. Do not build AWS support until Civo is fully working.
 
 ## Tech stack
 
 - **CLI**: Python 3.12+, Typer for commands, Jinja2 for template rendering, PyYAML for config
-- **Generated frontend**: Next.js 14 (App Router, TypeScript, standalone output)
+- **Generated web frontend**: Next.js 14 (App Router, TypeScript, standalone output) or React/Vite
+- **Generated mobile frontend**: Expo (React Native) with Expo Router, EAS Build
 - **Generated backend**: FastAPI + SQLAlchemy 2.0 async + asyncpg + Alembic
 - **Infrastructure**: Crossplane with Kubernetes provider (local) and Civo provider (production)
 - **GitOps**: ArgoCD with App-of-Apps
@@ -54,7 +55,7 @@ These decisions are final. Do not revisit or suggest alternatives.
 
 ## Generated project structure
 
-When a user runs `kreator init my-app`, the output looks like this:
+When a user runs `kreator init my-app`, the output looks like this (single frontend default):
 
 ```
 my-app/
@@ -62,9 +63,9 @@ my-app/
   Makefile                      # Convenience targets wrapping kreator commands
   README.md                     # Generated docs for this specific project
   apps/
-    frontend/                   # Next.js or React app (from template)
+    frontend/                   # Next.js, React, or Expo app (from template)
       src/
-      Dockerfile
+      Dockerfile                # Only for web frontends (nextjs, react)
       package.json
       ...
     backend/                    # FastAPI, Express, or Go app (from template)
@@ -85,12 +86,12 @@ my-app/
   deploy/
     argocd/
       root-app.yaml             # App-of-Apps root
-      apps/                     # One Application CR per component
-        frontend.yaml
+      apps/                     # One Application CR per web frontend + backend
+        frontend.yaml           # Only generated for web frontends
         backend.yaml
         database.yaml           # ArgoCD manages the Crossplane Claims too
     helm/
-      frontend/                 # Helm chart for frontend deployment
+      frontend/                 # Helm chart only for web frontends
         Chart.yaml
         values.yaml
         templates/
@@ -114,17 +115,58 @@ my-app/
       secrets.yaml
 ```
 
+With multiple frontends (`--frontend web:nextjs --frontend mobile:expo`), the structure changes:
+
+```
+my-app/
+  apps/
+    web/                        # Next.js app (web platform, deployed to K8s)
+    mobile/                     # Expo app (mobile platform, built via EAS)
+    backend/                    # Shared backend
+  deploy/
+    helm/
+      web/                      # Helm chart for web frontend only
+      backend/
+    argocd/
+      apps/
+        web.yaml                # ArgoCD app for web frontend only
+        backend.yaml
+  .github/
+    workflows/
+      mobile-mobile.yml         # GitHub Actions CI for EAS Build
+```
+
+Mobile frontends do not get Helm charts, ArgoCD apps, or ingress rules. They get GitHub Actions workflows for EAS Build instead.
+
 ## kreator.yaml spec
 
+Single frontend (default):
 ```yaml
 name: my-app
-frontend: nextjs          # nextjs | react
+frontend: nextjs          # nextjs | react | expo
 backend: fastapi          # fastapi | express | go
 database: postgres        # Only postgres for now
 provider: civo            # civo | local (local is implicit for kreator dev)
 region: lon1              # Provider-specific
 repo_url: ""              # Git repo URL for ArgoCD sync (defaults to github.com/OWNER/<name>)
 ```
+
+Multiple frontends:
+```yaml
+name: my-app
+frontends:
+  - name: web             # Directory name under apps/, also used for helm/argocd
+    template: nextjs      # Which template to render
+  - name: mobile
+    template: expo
+backend: fastapi
+database: postgres
+provider: civo
+region: lon1
+repo_url: ""
+```
+
+The `frontend` (singular) and `frontends` (list) fields are mutually exclusive. If `frontend` is used, it creates a single frontend named "frontend". Platform type (web or mobile) is derived from the template: nextjs/react are web, expo is mobile.
 
 ## CLI repo structure
 
@@ -149,8 +191,9 @@ kreator/
       civo.py                   # Civo Crossplane provider setup + resource management
   templates/
     frontend/
-      nextjs/                   # Jinja2-templated Next.js app
-      react/                    # Jinja2-templated React/Vite app
+      nextjs/                   # Jinja2-templated Next.js app (web platform)
+      react/                    # Jinja2-templated React/Vite app (web platform)
+      expo/                     # Jinja2-templated Expo/React Native app (mobile platform)
     backend/
       fastapi/                  # Jinja2-templated FastAPI app
       express/                  # Jinja2-templated Express/TypeScript app
@@ -165,11 +208,13 @@ kreator/
         provider-configs/
         claims/
       helm/
-        frontend/
+        frontend/               # Rendered per web frontend (parameterized by frontend_name)
         backend/
       observability/
       ingress/
       sealed-secrets/
+    ci/
+      mobile/                   # GitHub Actions workflow for EAS Build (rendered per mobile frontend)
     project/                    # Top-level project files
       kreator.yaml.j2
       Makefile.j2
@@ -274,6 +319,18 @@ Generated Helm charts follow these conventions:
 - [x] Verify interchangeability: `kreator init --frontend react --backend express` works end to end
 
 **Done when:** Observability works as an addon, multiple stack combinations are supported.
+
+### Phase 5: Multi-frontend + mobile support
+- [x] `FrontendSpec` model with name, template, and platform (web/mobile)
+- [x] Repeatable `--frontend` flag with `name:template` syntax
+- [x] Renderer loops over frontends, generates per-frontend helm/argocd for web, CI for mobile
+- [x] Expo (React Native) frontend template with Expo Router, SecureStore auth, todo CRUD
+- [x] GitHub Actions CI template for EAS Build (mobile frontends)
+- [x] Backwards compatibility: single `--frontend nextjs` and `frontend:` in kreator.yaml still work
+- [x] Dynamic filename rendering in templates (Jinja2 expressions in filenames)
+- [x] `install_helm_releases` dynamically discovers charts instead of hardcoding frontend/backend
+
+**Done when:** `kreator init my-app --frontend web:nextjs --frontend mobile:expo` produces a working multi-frontend project.
 
 ## Common commands during development
 
