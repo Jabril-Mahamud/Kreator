@@ -24,16 +24,34 @@ kreator destroy              # Tear down cloud resources
 
 ## Available templates
 
-| Layer    | Options                     |
-|----------|-----------------------------|
-| Frontend | `nextjs`, `react` (Vite)    |
-| Backend  | `fastapi`, `express`, `go`  |
+| Layer    | Options                          | Platform |
+|----------|----------------------------------|----------|
+| Frontend | `nextjs`, `react` (Vite)         | web      |
+| Frontend | `expo` (React Native)            | mobile   |
+| Backend  | `fastapi`, `express`, `go`       |          |
 
 Pick your stack at init time:
 
 ```bash
 kreator init my-app --frontend react --backend express
 ```
+
+## Multiple frontends
+
+A single backend can serve multiple frontends. Use `name:template` syntax with repeatable `--frontend` flags:
+
+```bash
+kreator init my-app --frontend web:nextjs --frontend mobile:expo
+```
+
+This generates:
+- `apps/web/` with a Next.js app, deployed to K8s via Helm and ArgoCD
+- `apps/mobile/` with an Expo app, built via GitHub Actions and EAS Build
+- `apps/backend/` shared by both
+
+Web frontends get Helm charts, ArgoCD apps, and ingress rules. Mobile frontends get GitHub Actions CI workflows for building and publishing to app stores. Both share the same backend API.
+
+If you only pass a template name without a prefix (e.g. `--frontend nextjs`), it behaves like before, creating a single frontend named `frontend`.
 
 ## What gets generated
 
@@ -42,9 +60,10 @@ A self-contained project with:
 - Application code (frontend + backend + Dockerfiles)
 - Crossplane XRDs and Compositions (local Kind and Civo)
 - ArgoCD App-of-Apps config
-- Helm charts for both apps
+- Helm charts for web frontends and backend
 - Sealed Secrets
 - LGTM observability stack (opt-in)
+- GitHub Actions CI for mobile frontends (when applicable)
 
 The generated project does not depend on the Kreator CLI to run after scaffolding. `kreator dev` and `kreator deploy` are convenience wrappers around kubectl, helm, and kind.
 
@@ -57,7 +76,9 @@ The generated project does not depend on the Kreator CLI to run after scaffoldin
 - nginx ingress routing to frontend and backend
 - Images built and pushed to a local registry
 
-Access your app at `http://frontend.localhost:9080` and `http://api.localhost:9080`.
+Access your web frontends at `http://<name>.localhost:9080` (e.g. `http://frontend.localhost:9080`) and the backend at `http://api.localhost:9080`.
+
+Mobile frontends are not deployed to the local cluster. Run `cd apps/<name> && npx expo start` to start the Expo dev server.
 
 Add `--with-observability` to install the LGTM stack (Loki, Grafana, Tempo, Mimir).
 
