@@ -1,24 +1,13 @@
 import logging
-import subprocess
+
+from kreator.core.shell import run
 
 logger = logging.getLogger(__name__)
 
 
-def _run(cmd: list[str], check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
-    try:
-        return subprocess.run(cmd, check=check, capture_output=capture, text=True)
-    except subprocess.CalledProcessError as e:
-        msg = f"Command failed: {' '.join(cmd)}"
-        if e.stderr:
-            msg += f"\n{e.stderr.strip()}"
-        raise RuntimeError(msg) from e
-    except FileNotFoundError:
-        raise RuntimeError(f"Command not found: {cmd[0]}. Is it installed and on your PATH?")
-
-
 def install_observability_stack() -> None:
     """Install the LGTM observability stack: Loki, Grafana, Tempo, Mimir, Promtail."""
-    _run(["kubectl", "create", "namespace", "observability"], check=False)
+    run(["kubectl", "create", "namespace", "observability"], check=False)
 
     _install_loki()
     _install_tempo()
@@ -31,7 +20,7 @@ def install_observability_stack() -> None:
 
 def _install_loki() -> None:
     logger.info("installing loki")
-    _run(
+    run(
         [
             "helm",
             "repo",
@@ -41,9 +30,9 @@ def _install_loki() -> None:
         ],
         check=False,
     )
-    _run(["helm", "repo", "update"])
+    run(["helm", "repo", "update"])
 
-    _run(
+    run(
         [
             "helm",
             "upgrade",
@@ -71,7 +60,7 @@ def _install_loki() -> None:
 
 def _install_tempo() -> None:
     logger.info("installing tempo")
-    _run(
+    run(
         [
             "helm",
             "upgrade",
@@ -89,7 +78,7 @@ def _install_tempo() -> None:
 
 def _install_mimir() -> None:
     logger.info("installing mimir")
-    _run(
+    run(
         [
             "helm",
             "upgrade",
@@ -111,7 +100,7 @@ def _install_mimir() -> None:
 
 def _install_promtail() -> None:
     logger.info("installing promtail")
-    _run(
+    run(
         [
             "helm",
             "upgrade",
@@ -131,7 +120,7 @@ def _install_promtail() -> None:
 
 def _install_grafana() -> None:
     logger.info("installing grafana")
-    _run(
+    run(
         [
             "helm",
             "upgrade",
