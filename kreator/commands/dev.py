@@ -7,6 +7,7 @@ import typer
 from kreator.core.cluster import create_cluster, delete_cluster, wait_for_cluster_ready
 from kreator.core.config import KreatorConfig, load_config
 from kreator.core.platform import (
+    GIT_SERVER_URL,
     apply_manifests,
     check_prerequisites,
     deploy_git_server,
@@ -15,6 +16,8 @@ from kreator.core.platform import (
     install_crossplane,
     install_ingress_nginx,
     install_sealed_secrets,
+    patch_argocd_repo_url,
+    patch_claims_for_env,
     setup_argocd_apps,
     wait_for_argocd_sync,
     wait_for_db_ready,
@@ -72,6 +75,7 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
             typer.echo(f"  - {err}", err=True)
         raise typer.Exit(1)
 
+    _prepare_for_local_dev(project_dir)
     _ensure_git_committed(project_dir)
 
     typer.echo("\n[1/7] Starting local registry...")
@@ -129,19 +133,35 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
     typer.echo("\nTo tear down: kreator dev --destroy")
 
 
+def _prepare_for_local_dev(project_dir: Path) -> None:
+    """Patch project files so the in-cluster git server and ArgoCD use local-dev settings."""
+    patch_claims_for_env(project_dir, "local")
+    patch_argocd_repo_url(project_dir, GIT_SERVER_URL)
+
+
 def _ensure_git_committed(project_dir: Path) -> None:
     """Make sure the project has at least one commit so the git server can clone it."""
     from kreator.core.shell import run
 
     result = run(
         ["git", "-C", str(project_dir), "rev-parse", "HEAD"],
-        capture=True, check=False,
+        capture=True,
+        check=False,
     )
-    if result.returncode == 0:
+    if result.returncode != 0:
+        logger.info("creating initial git commit")
+        run(["git", "-C", str(project_dir), "add", "-A"])
+        run(["git", "-C", str(project_dir), "commit", "-m", "initial scaffold"])
         return
-    logger.info("creating initial git commit")
-    run(["git", "-C", str(project_dir), "add", "-A"])
-    run(["git", "-C", str(project_dir), "commit", "-m", "initial scaffold"])
+    status = run(
+        ["git", "-C", str(project_dir), "status", "--porcelain"],
+        capture=True,
+        check=False,
+    )
+    if status.returncode == 0 and status.stdout.strip():
+        logger.info("committing pending changes for local dev")
+        run(["git", "-C", str(project_dir), "add", "-A"])
+        run(["git", "-C", str(project_dir), "commit", "-m", "prepare for local dev"])
 
 
 def _preload_images() -> None:
@@ -153,7 +173,8 @@ def _preload_images() -> None:
     for image in images:
         result = run(
             ["docker", "image", "inspect", image],
-            capture=True, check=False,
+            capture=True,
+            check=False,
         )
         if result.returncode != 0:
             logger.info("pulling %s", image)

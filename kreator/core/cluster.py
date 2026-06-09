@@ -128,7 +128,7 @@ def _configure_registry_on_nodes() -> None:
     registry_internal_port = 5000
     hosts_toml = (
         f'server = "http://{REGISTRY_NAME}:{registry_internal_port}"\n'
-        f'\n'
+        f"\n"
         f'[host."http://{REGISTRY_NAME}:{registry_internal_port}"]\n'
         f'  capabilities = ["pull", "resolve", "push"]\n'
     )
@@ -138,8 +138,14 @@ def _configure_registry_on_nodes() -> None:
         '  config_path = "/etc/containerd/certs.d"\n'
     )
     result = run(
-        ["docker", "ps", "--filter", f"label=io.x-k8s.kind.cluster={CLUSTER_NAME}",
-         "--format", "{{.Names}}"],
+        [
+            "docker",
+            "ps",
+            "--filter",
+            f"label=io.x-k8s.kind.cluster={CLUSTER_NAME}",
+            "--format",
+            "{{.Names}}",
+        ],
         capture=True,
     )
     nodes = result.stdout.strip().split()
