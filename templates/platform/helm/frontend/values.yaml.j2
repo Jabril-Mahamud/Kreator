@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: localhost:5001/{{ name }}-{{ frontend_name }}
+  repository: localhost:5001/{{ name | lower }}-{{ frontend_name | lower }}
   tag: latest
   pullPolicy: Always
 

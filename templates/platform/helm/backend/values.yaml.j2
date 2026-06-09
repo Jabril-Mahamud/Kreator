@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: localhost:5001/{{ name }}-backend
+  repository: localhost:5001/{{ name | lower }}-backend
   tag: latest
   pullPolicy: Always
 
