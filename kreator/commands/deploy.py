@@ -8,9 +8,10 @@ from kreator.core.config import load_config
 from kreator.core.platform import (
     install_argocd,
     install_crossplane,
-    install_helm_releases,
     install_ingress_nginx,
     install_sealed_secrets,
+    setup_argocd_apps,
+    wait_for_argocd_sync,
 )
 from kreator.providers.civo import (
     apply_civo_manifests,
@@ -59,6 +60,15 @@ def deploy(
         )
         raise typer.Exit(1)
 
+    repo_url = config.repo_url or ""
+    if not repo_url or "OWNER" in repo_url:
+        typer.echo(
+            "Error: a real repo_url is required for cloud deploy. "
+            "Set repo_url in kreator.yaml or pass it during kreator init.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
     typer.echo(f"Deploying '{config.name}' to Civo ({config.region})...")
 
     typer.echo("\n[1/7] Installing Crossplane...")
@@ -79,11 +89,17 @@ def deploy(
     typer.echo("[5/7] Waiting for infrastructure to provision...")
     wait_for_claims_ready(project_dir)
 
-    typer.echo("[6/7] Creating application secrets from database credentials...")
+    typer.echo("[6/7] Creating application secrets...")
     create_app_secrets(config.name)
 
-    typer.echo("[7/7] Installing application via Helm...")
-    install_helm_releases(project_dir)
+    typer.echo("[7/7] Configuring ArgoCD and waiting for sync...")
+    setup_argocd_apps(project_dir)
+
+    app_names = [f"{config.name}-backend"]
+    for fe in config.web_frontends:
+        app_names.append(f"{config.name}-{fe.name}")
+    app_names.append(f"{config.name}-database")
+    wait_for_argocd_sync(app_names, timeout=600)
 
     typer.echo("\nDeployment complete!")
     typer.echo(f"  Provider: {config.provider}")
