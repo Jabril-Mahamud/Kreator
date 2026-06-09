@@ -20,7 +20,6 @@ from kreator.core.platform import (
     patch_claims_for_env,
     seal_secrets,
     setup_argocd_apps,
-    wait_for_argocd_sync,
     wait_for_db_ready,
 )
 from kreator.core.registry import build_and_push, start_registry, stop_registry
@@ -79,42 +78,35 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
     _prepare_for_local_dev(project_dir)
     _ensure_git_committed(project_dir)
 
-    typer.echo("\n[1/7] Starting local registry...")
+    typer.echo("\n[1/6] Starting local registry...")
     start_registry()
 
-    typer.echo("[2/7] Creating Kind cluster...")
+    typer.echo("[2/6] Creating Kind cluster...")
     create_cluster(project_dir)
     wait_for_cluster_ready()
 
     _preload_images()
 
-    typer.echo("[3/7] Installing platform (Crossplane, ArgoCD, ingress, sealed-secrets)...")
+    typer.echo("[3/6] Installing platform (Crossplane, ArgoCD, ingress, sealed-secrets)...")
     install_crossplane()
     install_ingress_nginx()
     install_sealed_secrets()
     install_argocd()
 
-    typer.echo("[4/7] Building and pushing images, sealing secrets...")
+    typer.echo("[4/6] Building and pushing images, sealing secrets...")
     build_and_push(f"{config.name}-backend", str(project_dir / "apps" / "backend"))
     for fe in config.web_frontends:
         build_and_push(f"{config.name}-{fe.name}", str(project_dir / "apps" / fe.name))
     seal_secrets(project_dir)
     _ensure_git_committed(project_dir)
 
-    typer.echo("[5/7] Applying infrastructure (XRDs, compositions, claims)...")
+    typer.echo("[5/6] Applying infrastructure (XRDs, compositions, claims)...")
     apply_manifests(project_dir)
     wait_for_db_ready(config.name)
 
-    typer.echo("[6/7] Deploying git server and configuring ArgoCD...")
+    typer.echo("[6/6] Deploying git server and configuring ArgoCD...")
     deploy_git_server()
-    app_names = [f"{config.name}-backend"]
-    for fe in config.web_frontends:
-        app_names.append(f"{config.name}-{fe.name}")
-    app_names.append(f"{config.name}-database")
     setup_argocd_apps(project_dir)
-
-    typer.echo("[7/7] Waiting for ArgoCD to sync...")
-    wait_for_argocd_sync(app_names, timeout=480)
 
     if with_observability:
         typer.echo("Installing observability stack...")
@@ -122,6 +114,7 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
 
     password = get_argocd_password()
     typer.echo("\nLocal dev environment ready!")
+    typer.echo("\nArgoCD is syncing your apps. Watch progress in the dashboard:")
     typer.echo(f"\n  ArgoCD:   http://localhost:9080/argocd  (admin / {password})")
     for fe in config.web_frontends:
         typer.echo(f"  {fe.name}: http://{fe.name}.localhost:9080")

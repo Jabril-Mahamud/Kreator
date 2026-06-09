@@ -312,11 +312,10 @@ def apply_manifests(project_dir: Path) -> None:
         run(["kubectl", "apply", "-f", str(xrds)])
         wait_for_crd("databases.kreator.dev")
 
-    provider_configs = infra_dir / "provider-configs"
-    if provider_configs.is_dir():
-        logger.info("applying provider configs")
-        for f in provider_configs.glob("*.yaml"):
-            run(["kubectl", "apply", "-f", str(f)], check=False)
+    local_provider_config = infra_dir / "provider-configs" / "local.yaml"
+    if local_provider_config.exists():
+        logger.info("applying local provider config")
+        run(["kubectl", "apply", "-f", str(local_provider_config)], check=False)
         time.sleep(3)
 
     compositions_dir = infra_dir / "compositions" / "local"
