@@ -135,7 +135,8 @@ def _ensure_git_committed(project_dir: Path) -> None:
 
     result = run(
         ["git", "-C", str(project_dir), "rev-parse", "HEAD"],
-        capture=True, check=False,
+        capture=True,
+        check=False,
     )
     if result.returncode == 0:
         return
@@ -153,7 +154,8 @@ def _preload_images() -> None:
     for image in images:
         result = run(
             ["docker", "image", "inspect", image],
-            capture=True, check=False,
+            capture=True,
+            check=False,
         )
         if result.returncode != 0:
             logger.info("pulling %s", image)
