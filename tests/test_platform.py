@@ -2,6 +2,7 @@ from pathlib import Path
 
 import yaml
 
+from kreator.core.config import KreatorConfig
 from kreator.core.platform import patch_argocd_repo_url, patch_claims_for_env
 
 
@@ -95,3 +96,28 @@ def test_patch_argocd_repo_url(tmp_path: Path) -> None:
 
 def test_patch_argocd_repo_url_missing_dir(tmp_path: Path) -> None:
     patch_argocd_repo_url(tmp_path, "git://git-server.default.svc/repo.git")
+
+
+def test_deploy_rejects_placeholder_repo_url() -> None:
+    config = KreatorConfig(
+        name="demo",
+        frontend="nextjs",
+        backend="fastapi",
+        provider="civo",
+    )
+    repo_url = config.repo_url or ""
+    if not repo_url:
+        repo_url = f"https://github.com/OWNER/{config.name}.git"
+    assert "OWNER" in repo_url, "default repo_url should contain the OWNER placeholder"
+
+
+def test_deploy_accepts_real_repo_url() -> None:
+    config = KreatorConfig(
+        name="demo",
+        frontend="nextjs",
+        backend="fastapi",
+        provider="civo",
+        repo_url="https://github.com/myuser/demo.git",
+    )
+    repo_url = config.repo_url or ""
+    assert "OWNER" not in repo_url

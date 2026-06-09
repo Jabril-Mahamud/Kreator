@@ -440,17 +440,18 @@ def _wait_for_pod_ready(name: str, namespace: str, timeout: int = 120) -> None:
 
 
 def setup_argocd_apps(project_dir: Path) -> None:
-    """Apply ArgoCD Application CRs with repoURL pointed at the in-cluster git server."""
-    argocd_dir = project_dir / "deploy" / "argocd"
+    """Apply the ArgoCD root Application (app-of-apps) from the project directory.
 
-    apps_dir = argocd_dir / "apps"
-    if apps_dir.is_dir():
-        logger.info("applying argocd apps (via local git server)")
-        for app_file in apps_dir.glob("*.yaml"):
-            doc = yaml.safe_load(app_file.read_text())
-            doc["spec"]["source"]["repoURL"] = GIT_SERVER_URL
-            patched = yaml.dump(doc, default_flow_style=False)
-            run(["kubectl", "apply", "-f", "-"], input=patched)
+    The root app points at deploy/argocd/apps in the git source and auto-discovers
+    child Applications. The repoURL in the on-disk files must already be correct
+    for the target environment (patched for local dev, or rendered with a real
+    repo_url for cloud deploy).
+    """
+    argocd_dir = project_dir / "deploy" / "argocd"
+    root_app = argocd_dir / "root-app.yaml"
+    if root_app.exists():
+        logger.info("applying argocd root application (app-of-apps)")
+        run(["kubectl", "apply", "-f", str(root_app)])
 
 
 def get_argocd_password() -> str:
