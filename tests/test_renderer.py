@@ -67,7 +67,7 @@ def test_render_project_fastapi(tmp_path: Path) -> None:
     assert (output / "deploy" / "helm" / "backend" / "Chart.yaml").exists()
     assert (output / "deploy" / "helm" / "frontend" / "Chart.yaml").exists()
     assert (output / "secrets" / "raw" / ".gitkeep").exists()
-    assert (output / "secrets" / "sealed" / "secrets.yaml").exists()
+    assert (output / "secrets" / "raw" / "jwt-secret.yaml").exists()
 
 
 def test_render_project_go(tmp_path: Path) -> None:
@@ -117,11 +117,12 @@ def test_render_project_jwt_secret_generated(tmp_path: Path) -> None:
     output = tmp_path / "myapp"
     render_project(config, output)
 
-    secrets_path = output / "secrets" / "sealed" / "secrets.yaml"
-    content = secrets_path.read_text()
+    raw_path = output / "secrets" / "raw" / "jwt-secret.yaml"
+    content = raw_path.read_text()
     assert "REPLACE_ME" not in content
     assert "JWT_SECRET:" in content
     assert len(content.split("JWT_SECRET:")[1].strip().strip('"')) > 20
+    assert not (output / "secrets" / "sealed" / "secrets.yaml").exists()
 
 
 def test_render_project_repo_url_in_argocd(tmp_path: Path) -> None:
@@ -242,3 +243,14 @@ def test_render_project_helm_values_parameterized(tmp_path: Path) -> None:
     values = (output / "deploy" / "helm" / "frontend" / "values.yaml").read_text()
     assert "localhost:5001/myapp-frontend" in values
     assert "frontend.localhost" in values
+
+
+def test_render_project_backend_helm_references_split_secrets(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", frontend="nextjs", backend="fastapi")
+    output = tmp_path / "myapp"
+    render_project(config, output)
+
+    values = (output / "deploy" / "helm" / "backend" / "values.yaml").read_text()
+    assert "dbSecretName: myapp-db-credentials" in values
+    assert "jwtSecretName: myapp-jwt-secret" in values
+    assert "app-secrets" not in values

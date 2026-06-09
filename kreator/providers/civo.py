@@ -94,11 +94,6 @@ def apply_civo_manifests(project_dir: Path) -> None:
         run(["kubectl", "apply", "-f", str(compositions_dir)])
         time.sleep(3)
 
-    secrets_dir = project_dir / "secrets" / "sealed"
-    if secrets_dir.is_dir():
-        logger.info("applying secrets")
-        run(["kubectl", "apply", "-f", str(secrets_dir)])
-
     claims = infra_dir / "claims"
     if claims.is_dir():
         logger.info("applying crossplane claims")
@@ -134,11 +129,15 @@ def wait_for_claims_ready(project_dir: Path, timeout: int = 600) -> None:
     raise RuntimeError(f"Claims not ready after {timeout}s")
 
 
-def create_app_secrets(config_name: str) -> None:
-    """Read Civo database connection details and create the app secrets."""
+def create_db_credentials_secret(config_name: str) -> None:
+    """Read Civo database connection details and create the db-credentials secret.
+
+    The local composition creates this secret via Crossplane, but the Civo
+    composition only exposes individual connection fields. This assembles
+    DATABASE_URL and writes it to the same secret name the backend expects.
+    """
     import base64
     import json
-    import secrets
 
     conn_secret_name = f"{config_name}-db-conn"
     result = run(
@@ -156,25 +155,24 @@ def create_app_secrets(config_name: str) -> None:
         check=False,
     )
 
-    jwt_secret = secrets.token_urlsafe(32)
-
     if result.returncode == 0 and result.stdout.strip():
         data = json.loads(result.stdout)
         host = base64.b64decode(data.get("host", "")).decode()
         port = base64.b64decode(data.get("port", "")).decode() or "5432"
         username = base64.b64decode(data.get("username", "")).decode() or "postgres"
         password = base64.b64decode(data.get("password", "")).decode()
-        database_url = f"postgresql://{username}:{password}@{host}:{port}/{config_name}"
+        database_url = f"postgresql+asyncpg://{username}:{password}@{host}:{port}/{config_name}"
         logger.info("constructed database url from civo connection secret")
     else:
         logger.warning(
             "could not read connection secret %s, using placeholder database url",
             conn_secret_name,
         )
-        database_url = f"postgresql://postgres:postgres@{config_name}-db:5432/{config_name}"
+        database_url = f"postgresql+asyncpg://postgres:postgres@{config_name}-db:5432/{config_name}"
 
+    secret_name = f"{config_name}-db-credentials"
     run(
-        ["kubectl", "delete", "secret", f"{config_name}-app-secrets", "-n", "default"],
+        ["kubectl", "delete", "secret", secret_name, "-n", "default"],
         check=False,
     )
     run(
@@ -183,14 +181,13 @@ def create_app_secrets(config_name: str) -> None:
             "create",
             "secret",
             "generic",
-            f"{config_name}-app-secrets",
+            secret_name,
             f"--from-literal=DATABASE_URL={database_url}",
-            f"--from-literal=JWT_SECRET={jwt_secret}",
             "-n",
             "default",
         ]
     )
-    logger.info("app secrets created for %s", config_name)
+    logger.info("db credentials secret created for %s", config_name)
 
 
 def delete_civo_resources(project_dir: Path) -> None:

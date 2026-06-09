@@ -18,6 +18,7 @@ from kreator.core.platform import (
     install_sealed_secrets,
     patch_argocd_repo_url,
     patch_claims_for_env,
+    seal_secrets,
     setup_argocd_apps,
     wait_for_argocd_sync,
     wait_for_db_ready,
@@ -93,12 +94,14 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
     install_sealed_secrets()
     install_argocd()
 
-    typer.echo("[4/7] Building and pushing images...")
+    typer.echo("[4/7] Building and pushing images, sealing secrets...")
     build_and_push(f"{config.name}-backend", str(project_dir / "apps" / "backend"))
     for fe in config.web_frontends:
         build_and_push(f"{config.name}-{fe.name}", str(project_dir / "apps" / fe.name))
+    seal_secrets(project_dir)
+    _ensure_git_committed(project_dir)
 
-    typer.echo("[5/7] Applying infrastructure (XRDs, compositions, claims, secrets)...")
+    typer.echo("[5/7] Applying infrastructure (XRDs, compositions, claims)...")
     apply_manifests(project_dir)
     wait_for_db_ready(config.name)
 
