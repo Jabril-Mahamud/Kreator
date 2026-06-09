@@ -97,8 +97,15 @@ spec:
 
     time.sleep(10)
     result = run(
-        ["kubectl", "get", "sa", "-n", "crossplane-system",
-         "-o", "jsonpath={.items[*].metadata.name}"],
+        [
+            "kubectl",
+            "get",
+            "sa",
+            "-n",
+            "crossplane-system",
+            "-o",
+            "jsonpath={.items[*].metadata.name}",
+        ],
         capture=True,
     )
     sa_name = "provider-kubernetes"
@@ -266,6 +273,35 @@ def install_sealed_secrets() -> None:
     )
 
 
+def patch_claims_for_env(project_dir: Path, provider: str) -> None:
+    """Rewrite compositionSelector.matchLabels.provider in all claim files on disk."""
+    claims_dir = project_dir / "infrastructure" / "claims"
+    if not claims_dir.is_dir():
+        return
+    for claim_file in claims_dir.glob("*.yaml"):
+        doc = yaml.safe_load(claim_file.read_text())
+        sel = doc.get("spec", {}).get("compositionSelector", {})
+        labels = sel.get("matchLabels", {})
+        if "provider" in labels:
+            labels["provider"] = provider
+            claim_file.write_text(yaml.dump(doc, default_flow_style=False))
+            logger.info("patched %s: provider=%s", claim_file.name, provider)
+
+
+def patch_argocd_repo_url(project_dir: Path, repo_url: str) -> None:
+    """Rewrite spec.source.repoURL in all ArgoCD Application manifests on disk."""
+    argocd_dir = project_dir / "deploy" / "argocd"
+    if not argocd_dir.is_dir():
+        return
+    for app_file in argocd_dir.rglob("*.yaml"):
+        doc = yaml.safe_load(app_file.read_text())
+        source = doc.get("spec", {}).get("source", {})
+        if "repoURL" in source:
+            source["repoURL"] = repo_url
+            app_file.write_text(yaml.dump(doc, default_flow_style=False))
+            logger.info("patched %s: repoURL=%s", app_file.name, repo_url)
+
+
 def apply_manifests(project_dir: Path) -> None:
     """Apply Crossplane XRDs, provider configs, compositions, claims, and secrets."""
     infra_dir = project_dir / "infrastructure"
@@ -307,7 +343,8 @@ def apply_manifests(project_dir: Path) -> None:
             run(["kubectl", "apply", "-f", "-"], input=patched)
         result = run(
             ["kubectl", "get", "databases.kreator.dev", "-o", "name"],
-            capture=True, check=False,
+            capture=True,
+            check=False,
         )
         if result.returncode == 0 and result.stdout.strip():
             logger.info("claims applied: %s", result.stdout.strip())
@@ -322,9 +359,9 @@ def wait_for_db_ready(name: str, timeout: int = 180) -> None:
     start = time.time()
     while time.time() - start < timeout:
         result = run(
-            ["kubectl", "get", "statefulset", sts_name,
-             "-o", "jsonpath={.status.readyReplicas}"],
-            capture=True, check=False,
+            ["kubectl", "get", "statefulset", sts_name, "-o", "jsonpath={.status.readyReplicas}"],
+            capture=True,
+            check=False,
         )
         if result.returncode == 0 and result.stdout.strip() == "1":
             logger.info("database is ready")
@@ -392,9 +429,9 @@ def _wait_for_pod_ready(name: str, namespace: str, timeout: int = 120) -> None:
     start = time.time()
     while time.time() - start < timeout:
         result = run(
-            ["kubectl", "get", "pod", name, "-n", namespace,
-             "-o", "jsonpath={.status.phase}"],
-            capture=True, check=False,
+            ["kubectl", "get", "pod", name, "-n", namespace, "-o", "jsonpath={.status.phase}"],
+            capture=True,
+            check=False,
         )
         if result.returncode == 0 and result.stdout.strip() == "Running":
             return
@@ -419,13 +456,23 @@ def setup_argocd_apps(project_dir: Path) -> None:
 def get_argocd_password() -> str:
     """Get the ArgoCD initial admin password."""
     result = run(
-        ["kubectl", "get", "secret", "argocd-initial-admin-secret",
-         "-n", "argocd", "-o", "jsonpath={.data.password}"],
-        capture=True, check=False,
+        [
+            "kubectl",
+            "get",
+            "secret",
+            "argocd-initial-admin-secret",
+            "-n",
+            "argocd",
+            "-o",
+            "jsonpath={.data.password}",
+        ],
+        capture=True,
+        check=False,
     )
     if result.returncode != 0 or not result.stdout.strip():
         return "<not yet available>"
     import base64
+
     return base64.b64decode(result.stdout.strip()).decode()
 
 
@@ -437,9 +484,18 @@ def wait_for_argocd_sync(app_names: list[str], timeout: int = 300) -> None:
         all_healthy = True
         for name in app_names:
             result = run(
-                ["kubectl", "get", "application", name, "-n", "argocd",
-                 "-o", "jsonpath={.status.health.status}"],
-                capture=True, check=False,
+                [
+                    "kubectl",
+                    "get",
+                    "application",
+                    name,
+                    "-n",
+                    "argocd",
+                    "-o",
+                    "jsonpath={.status.health.status}",
+                ],
+                capture=True,
+                check=False,
             )
             if result.returncode != 0 or result.stdout.strip() != "Healthy":
                 all_healthy = False

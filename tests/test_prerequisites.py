@@ -51,9 +51,7 @@ class TestCheckPrerequisites:
 class TestWaitForDbReady:
     def test_uses_dynamic_name(self):
         with patch("kreator.core.platform.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(
-                [], 0, stdout="1", stderr=""
-            )
+            mock_run.return_value = subprocess.CompletedProcess([], 0, stdout="1", stderr="")
             wait_for_db_ready("my-project", timeout=5)
 
         call_args = mock_run.call_args_list[0]
@@ -62,9 +60,7 @@ class TestWaitForDbReady:
 
     def test_different_project_name(self):
         with patch("kreator.core.platform.run") as mock_run:
-            mock_run.return_value = subprocess.CompletedProcess(
-                [], 0, stdout="1", stderr=""
-            )
+            mock_run.return_value = subprocess.CompletedProcess([], 0, stdout="1", stderr="")
             wait_for_db_ready("cool-app", timeout=5)
 
         call_args = mock_run.call_args_list[0]
