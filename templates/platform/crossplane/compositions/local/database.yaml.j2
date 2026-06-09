@@ -27,7 +27,7 @@ spec:
                 POSTGRES_USER: postgres
                 POSTGRES_PASSWORD: postgres
                 POSTGRES_DB: {{ name }}
-                DATABASE_URL: "postgresql://postgres:postgres@{{ name }}-db:5432/{{ name }}"
+                DATABASE_URL: "postgresql+asyncpg://postgres:postgres@{{ name }}-db:5432/{{ name }}"
           providerConfigRef:
             name: provider-kubernetes
       patches:

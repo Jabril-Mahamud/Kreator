@@ -7,12 +7,20 @@ import typer
 from kreator.core.cluster import create_cluster, delete_cluster, wait_for_cluster_ready
 from kreator.core.config import KreatorConfig, load_config
 from kreator.core.platform import (
+    GIT_SERVER_URL,
     apply_manifests,
+    check_prerequisites,
+    deploy_git_server,
+    get_argocd_password,
     install_argocd,
     install_crossplane,
-    install_helm_releases,
     install_ingress_nginx,
     install_sealed_secrets,
+    patch_argocd_repo_url,
+    patch_claims_for_env,
+    setup_argocd_apps,
+    wait_for_argocd_sync,
+    wait_for_db_ready,
 )
 from kreator.core.registry import build_and_push, start_registry, stop_registry
 
@@ -32,6 +40,10 @@ def dev(
         stream=sys.stdout,
     )
 
+    if destroy:
+        _destroy()
+        return
+
     project_dir = Path.cwd()
     config_path = project_dir / "kreator.yaml"
 
@@ -43,11 +55,6 @@ def dev(
         raise typer.Exit(1)
 
     config = load_config(config_path)
-
-    if destroy:
-        _destroy()
-        return
-
     _setup(project_dir, config, with_observability)
 
 
@@ -61,35 +68,58 @@ def _destroy() -> None:
 def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -> None:
     typer.echo(f"Setting up local dev environment for '{config.name}'...")
 
-    typer.echo("\n[1/6] Starting local registry...")
+    errors = check_prerequisites()
+    if errors:
+        typer.echo("Missing prerequisites:", err=True)
+        for err in errors:
+            typer.echo(f"  - {err}", err=True)
+        raise typer.Exit(1)
+
+    _prepare_for_local_dev(project_dir)
+    _ensure_git_committed(project_dir)
+
+    typer.echo("\n[1/7] Starting local registry...")
     start_registry()
 
-    typer.echo("[2/6] Creating Kind cluster...")
-    create_cluster()
+    typer.echo("[2/7] Creating Kind cluster...")
+    create_cluster(project_dir)
     wait_for_cluster_ready()
 
-    typer.echo("[3/6] Installing platform (Crossplane, ArgoCD, ingress, sealed-secrets)...")
+    _preload_images()
+
+    typer.echo("[3/7] Installing platform (Crossplane, ArgoCD, ingress, sealed-secrets)...")
     install_crossplane()
     install_ingress_nginx()
     install_sealed_secrets()
     install_argocd()
 
-    typer.echo("[4/6] Building and pushing images...")
+    typer.echo("[4/7] Building and pushing images...")
     build_and_push(f"{config.name}-backend", str(project_dir / "apps" / "backend"))
     for fe in config.web_frontends:
         build_and_push(f"{config.name}-{fe.name}", str(project_dir / "apps" / fe.name))
 
-    typer.echo("[5/6] Applying infrastructure (XRDs, compositions, claims, secrets)...")
+    typer.echo("[5/7] Applying infrastructure (XRDs, compositions, claims, secrets)...")
     apply_manifests(project_dir)
+    wait_for_db_ready(config.name)
 
-    typer.echo("[6/6] Installing application via Helm...")
-    install_helm_releases(project_dir)
+    typer.echo("[6/7] Deploying git server and configuring ArgoCD...")
+    deploy_git_server()
+    app_names = [f"{config.name}-backend"]
+    for fe in config.web_frontends:
+        app_names.append(f"{config.name}-{fe.name}")
+    app_names.append(f"{config.name}-database")
+    setup_argocd_apps(project_dir)
+
+    typer.echo("[7/7] Waiting for ArgoCD to sync...")
+    wait_for_argocd_sync(app_names, timeout=480)
 
     if with_observability:
         typer.echo("Installing observability stack...")
         _install_observability()
 
+    password = get_argocd_password()
     typer.echo("\nLocal dev environment ready!")
+    typer.echo(f"\n  ArgoCD:   http://localhost:9080/argocd  (admin / {password})")
     for fe in config.web_frontends:
         typer.echo(f"  {fe.name}: http://{fe.name}.localhost:9080")
     typer.echo("  Backend:  http://api.localhost:9080")
@@ -101,6 +131,58 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
         )
 
     typer.echo("\nTo tear down: kreator dev --destroy")
+
+
+def _prepare_for_local_dev(project_dir: Path) -> None:
+    """Patch project files so the in-cluster git server and ArgoCD use local-dev settings."""
+    patch_claims_for_env(project_dir, "local")
+    patch_argocd_repo_url(project_dir, GIT_SERVER_URL)
+
+
+def _ensure_git_committed(project_dir: Path) -> None:
+    """Make sure the project has at least one commit so the git server can clone it."""
+    from kreator.core.shell import run
+
+    result = run(
+        ["git", "-C", str(project_dir), "rev-parse", "HEAD"],
+        capture=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        logger.info("creating initial git commit")
+        run(["git", "-C", str(project_dir), "add", "-A"])
+        run(["git", "-C", str(project_dir), "commit", "-m", "initial scaffold"])
+        return
+    status = run(
+        ["git", "-C", str(project_dir), "status", "--porcelain"],
+        capture=True,
+        check=False,
+    )
+    if status.returncode == 0 and status.stdout.strip():
+        logger.info("committing pending changes for local dev")
+        run(["git", "-C", str(project_dir), "add", "-A"])
+        run(["git", "-C", str(project_dir), "commit", "-m", "prepare for local dev"])
+
+
+def _preload_images() -> None:
+    """Push common images to the local registry so kind nodes can pull them."""
+    from kreator.core.registry import REGISTRY_PORT
+    from kreator.core.shell import run
+
+    images = ["postgres:16-alpine"]
+    for image in images:
+        result = run(
+            ["docker", "image", "inspect", image],
+            capture=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            logger.info("pulling %s", image)
+            run(["docker", "pull", image])
+        local_tag = f"localhost:{REGISTRY_PORT}/{image}"
+        logger.info("pushing %s to local registry", image)
+        run(["docker", "tag", image, local_tag])
+        run(["docker", "push", local_tag])
 
 
 def _install_observability() -> None:

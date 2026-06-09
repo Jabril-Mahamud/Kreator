@@ -1,44 +1,23 @@
 import logging
-import subprocess
 import time
 from pathlib import Path
+
+from kreator.core.platform import wait_for_crd
+from kreator.core.shell import run
 
 logger = logging.getLogger(__name__)
 
 
-def _run(
-    cmd: list[str],
-    check: bool = True,
-    capture: bool = False,
-    input: str | None = None,
-) -> subprocess.CompletedProcess:
-    try:
-        kwargs: dict = {"check": check, "text": True}
-        if input is not None:
-            kwargs["input"] = input
-            kwargs["capture_output"] = True
-        elif capture:
-            kwargs["capture_output"] = True
-        return subprocess.run(cmd, **kwargs)
-    except subprocess.CalledProcessError as e:
-        msg = f"Command failed: {' '.join(cmd)}"
-        if e.stderr:
-            msg += f"\n{e.stderr.strip()}"
-        raise RuntimeError(msg) from e
-    except FileNotFoundError:
-        raise RuntimeError(f"Command not found: {cmd[0]}. Is it installed and on your PATH?")
-
-
 def setup_civo_api_key_secret(api_key: str) -> None:
     """Create the Civo API key secret in crossplane-system namespace."""
-    _run(["kubectl", "create", "namespace", "crossplane-system"], check=False)
+    run(["kubectl", "create", "namespace", "crossplane-system"], check=False)
 
-    _run(
+    run(
         ["kubectl", "delete", "secret", "civo-api-key", "-n", "crossplane-system"],
         check=False,
     )
 
-    _run(
+    run(
         [
             "kubectl",
             "create",
@@ -64,7 +43,7 @@ metadata:
 spec:
   package: xpkg.upbound.io/civo/provider-civo:v0.3.0
 """
-    _run(["kubectl", "apply", "-f", "-"], input=provider_yaml)
+    run(["kubectl", "apply", "-f", "-"], input=provider_yaml)
     logger.info("civo provider installed, waiting for CRDs")
 
     _wait_for_provider_ready("provider-civo", timeout=180)
@@ -73,7 +52,7 @@ spec:
 def _wait_for_provider_ready(name: str, timeout: int = 180) -> None:
     start = time.time()
     while time.time() - start < timeout:
-        result = _run(
+        result = run(
             [
                 "kubectl",
                 "get",
@@ -99,31 +78,31 @@ def apply_civo_manifests(project_dir: Path) -> None:
     xrds = infra_dir / "xrds"
     if xrds.is_dir():
         logger.info("applying crossplane xrds")
-        _run(["kubectl", "apply", "-f", str(xrds)])
-        time.sleep(5)
+        run(["kubectl", "apply", "-f", str(xrds)])
+        wait_for_crd("databases.kreator.dev")
 
     provider_configs = infra_dir / "provider-configs"
     if provider_configs.is_dir():
         logger.info("applying provider configs")
         for f in provider_configs.glob("*.yaml"):
-            _run(["kubectl", "apply", "-f", str(f)], check=False)
+            run(["kubectl", "apply", "-f", str(f)], check=False)
         time.sleep(3)
 
     compositions_dir = infra_dir / "compositions" / "civo"
     if compositions_dir.is_dir():
         logger.info("applying civo compositions")
-        _run(["kubectl", "apply", "-f", str(compositions_dir)])
+        run(["kubectl", "apply", "-f", str(compositions_dir)])
         time.sleep(3)
 
     secrets_dir = project_dir / "secrets" / "sealed"
     if secrets_dir.is_dir():
         logger.info("applying secrets")
-        _run(["kubectl", "apply", "-f", str(secrets_dir)])
+        run(["kubectl", "apply", "-f", str(secrets_dir)])
 
     claims = infra_dir / "claims"
     if claims.is_dir():
         logger.info("applying crossplane claims")
-        _run(["kubectl", "apply", "-f", str(claims)])
+        run(["kubectl", "apply", "-f", str(claims)])
 
 
 def wait_for_claims_ready(project_dir: Path, timeout: int = 600) -> None:
@@ -135,7 +114,7 @@ def wait_for_claims_ready(project_dir: Path, timeout: int = 600) -> None:
     logger.info("waiting for crossplane claims to be ready (this may take several minutes)")
     start = time.time()
     while time.time() - start < timeout:
-        result = _run(
+        result = run(
             [
                 "kubectl",
                 "get",
@@ -162,7 +141,7 @@ def create_app_secrets(config_name: str) -> None:
     import secrets
 
     conn_secret_name = f"{config_name}-db-conn"
-    result = _run(
+    result = run(
         [
             "kubectl",
             "get",
@@ -194,11 +173,11 @@ def create_app_secrets(config_name: str) -> None:
         )
         database_url = f"postgresql://postgres:postgres@{config_name}-db:5432/{config_name}"
 
-    _run(
+    run(
         ["kubectl", "delete", "secret", f"{config_name}-app-secrets", "-n", "default"],
         check=False,
     )
-    _run(
+    run(
         [
             "kubectl",
             "create",
@@ -221,12 +200,12 @@ def delete_civo_resources(project_dir: Path) -> None:
     claims = infra_dir / "claims"
     if claims.is_dir():
         logger.info("deleting crossplane claims")
-        _run(["kubectl", "delete", "-f", str(claims)], check=False)
+        run(["kubectl", "delete", "-f", str(claims)], check=False)
 
     compositions_dir = infra_dir / "compositions" / "civo"
     if compositions_dir.is_dir():
         logger.info("deleting civo compositions")
-        _run(["kubectl", "delete", "-f", str(compositions_dir)], check=False)
+        run(["kubectl", "delete", "-f", str(compositions_dir)], check=False)
 
     logger.info("waiting for resources to be cleaned up")
     time.sleep(30)

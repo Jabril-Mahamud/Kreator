@@ -1,5 +1,6 @@
 import logging
-import subprocess
+
+from kreator.core.shell import run
 
 logger = logging.getLogger(__name__)
 
@@ -7,21 +8,9 @@ REGISTRY_NAME = "kreator-registry"
 REGISTRY_PORT = 5001
 
 
-def _run(cmd: list[str], check: bool = True, capture: bool = False) -> subprocess.CompletedProcess:
-    try:
-        return subprocess.run(cmd, check=check, capture_output=capture, text=True)
-    except subprocess.CalledProcessError as e:
-        msg = f"Command failed: {' '.join(cmd)}"
-        if e.stderr:
-            msg += f"\n{e.stderr.strip()}"
-        raise RuntimeError(msg) from e
-    except FileNotFoundError:
-        raise RuntimeError(f"Command not found: {cmd[0]}. Is it installed and on your PATH?")
-
-
 def _port_has_registry() -> bool:
     """Check if any container is already serving a registry on REGISTRY_PORT."""
-    result = _run(
+    result = run(
         [
             "docker",
             "ps",
@@ -37,7 +26,7 @@ def _port_has_registry() -> bool:
 
 
 def registry_running() -> bool:
-    result = _run(
+    result = run(
         ["docker", "inspect", "-f", "{{.State.Running}}", REGISTRY_NAME],
         capture=True,
         check=False,
@@ -54,7 +43,7 @@ def start_registry() -> None:
         logger.info("existing registry found on port %d, reusing it", REGISTRY_PORT)
         return
 
-    result = _run(
+    result = run(
         [
             "docker",
             "ps",
@@ -67,9 +56,9 @@ def start_registry() -> None:
         capture=True,
     )
     if REGISTRY_NAME in result.stdout.split():
-        _run(["docker", "start", REGISTRY_NAME])
+        run(["docker", "start", REGISTRY_NAME])
     else:
-        _run(
+        run(
             [
                 "docker",
                 "run",
@@ -90,15 +79,15 @@ def start_registry() -> None:
 def stop_registry() -> None:
     if not registry_running():
         return
-    _run(["docker", "stop", REGISTRY_NAME], check=False)
-    _run(["docker", "rm", REGISTRY_NAME], check=False)
+    run(["docker", "stop", REGISTRY_NAME], check=False)
+    run(["docker", "rm", REGISTRY_NAME], check=False)
     logger.info("registry stopped")
 
 
 def build_and_push(image_name: str, context_dir: str, registry_port: int = REGISTRY_PORT) -> str:
     tag = f"localhost:{registry_port}/{image_name}:latest"
     logger.info("building image: %s", tag)
-    _run(["docker", "build", "-t", tag, context_dir])
+    run(["docker", "build", "-t", tag, context_dir])
     logger.info("pushing image: %s", tag)
-    _run(["docker", "push", tag])
+    run(["docker", "push", tag])
     return tag

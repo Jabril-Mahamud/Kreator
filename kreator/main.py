@@ -3,6 +3,7 @@ import typer
 from kreator.commands.deploy import deploy
 from kreator.commands.destroy import destroy
 from kreator.commands.dev import dev
+from kreator.commands.doctor import doctor
 from kreator.commands.init import init
 
 app = typer.Typer(
@@ -15,6 +16,7 @@ app.command()(init)
 app.command()(dev)
 app.command()(deploy)
 app.command()(destroy)
+app.command()(doctor)
 
 if __name__ == "__main__":
     app()
