@@ -27,5 +27,6 @@ autoscaling:
   maxReplicas: 5
   targetCPUUtilization: 70
 
-secretName: {{ name }}-app-secrets
+dbSecretName: {{ name }}-db-credentials
+jwtSecretName: {{ name }}-jwt-secret
 configMapName: {{ name }}-backend-config

@@ -303,9 +303,8 @@ def patch_argocd_repo_url(project_dir: Path, repo_url: str) -> None:
 
 
 def apply_manifests(project_dir: Path) -> None:
-    """Apply Crossplane XRDs, provider configs, compositions, claims, and secrets."""
+    """Apply Crossplane XRDs, provider configs, compositions, and claims."""
     infra_dir = project_dir / "infrastructure"
-    secrets_dir = project_dir / "secrets" / "sealed"
 
     xrds = infra_dir / "xrds"
     if xrds.is_dir():
@@ -325,10 +324,6 @@ def apply_manifests(project_dir: Path) -> None:
         logger.info("applying local compositions")
         run(["kubectl", "apply", "-f", str(compositions_dir)])
         time.sleep(3)
-
-    if secrets_dir.is_dir():
-        logger.info("applying secrets")
-        run(["kubectl", "apply", "-f", str(secrets_dir)])
 
     claims = infra_dir / "claims"
     if claims.is_dir():
@@ -534,10 +529,48 @@ def install_helm_releases(project_dir: Path) -> None:
         )
 
 
+def seal_secrets(project_dir: Path) -> None:
+    """Seal raw secrets using kubeseal against the running cluster's controller."""
+    raw_dir = project_dir / "secrets" / "raw"
+    sealed_dir = project_dir / "secrets" / "sealed"
+    if not raw_dir.is_dir():
+        return
+
+    sealed_dir.mkdir(parents=True, exist_ok=True)
+
+    for raw_file in raw_dir.glob("*.yaml"):
+        sealed_file = sealed_dir / raw_file.name
+        logger.info("sealing %s", raw_file.name)
+        result = run(
+            [
+                "kubeseal",
+                "--format",
+                "yaml",
+                "--controller-namespace",
+                "kube-system",
+                "--controller-name",
+                "sealed-secrets",
+            ],
+            input=raw_file.read_text(),
+            capture=True,
+            check=False,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            sealed_file.write_text(result.stdout)
+            logger.info("sealed secret written to %s", sealed_file)
+        else:
+            logger.warning(
+                "kubeseal failed for %s (exit %d), applying raw secret as fallback",
+                raw_file.name,
+                result.returncode,
+            )
+            run(["kubectl", "apply", "-f", str(raw_file)], check=False)
+
+
 def check_prerequisites() -> list[str]:
     """Check that all required CLI tools are available."""
     errors = []
-    for tool in ("docker", "kind", "kubectl", "helm"):
+    for tool in ("docker", "kind", "kubectl", "helm", "kubeseal"):
         if not shutil.which(tool):
             errors.append(f"{tool} is not installed or not on PATH")
 

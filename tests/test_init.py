@@ -91,7 +91,7 @@ def test_init_infrastructure_generated(run_in_tmp: Path) -> None:
     assert (base / "deploy" / "argocd" / "apps" / "backend.yaml").exists()
     assert (base / "deploy" / "helm" / "backend" / "Chart.yaml").exists()
     assert (base / "deploy" / "helm" / "frontend" / "Chart.yaml").exists()
-    assert (base / "secrets" / "sealed" / "secrets.yaml").exists()
+    assert (base / "secrets" / "raw" / "jwt-secret.yaml").exists()
     assert (base / "secrets" / "raw" / ".gitkeep").exists()
 
 

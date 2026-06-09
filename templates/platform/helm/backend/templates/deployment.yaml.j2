@@ -31,7 +31,9 @@ spec:
               protocol: TCP
           envFrom:
             - secretRef:
-                name: {{ .Values.secretName }}
+                name: {{ .Values.dbSecretName }}
+            - secretRef:
+                name: {{ .Values.jwtSecretName }}
             - configMapRef:
                 name: {{ .Values.configMapName }}
                 optional: true

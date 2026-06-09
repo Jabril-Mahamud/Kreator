@@ -10,12 +10,13 @@ from kreator.core.platform import (
     install_crossplane,
     install_ingress_nginx,
     install_sealed_secrets,
+    seal_secrets,
     setup_argocd_apps,
     wait_for_argocd_sync,
 )
 from kreator.providers.civo import (
     apply_civo_manifests,
-    create_app_secrets,
+    create_db_credentials_secret,
     install_crossplane_provider_civo,
     setup_civo_api_key_secret,
     wait_for_claims_ready,
@@ -89,8 +90,9 @@ def deploy(
     typer.echo("[5/7] Waiting for infrastructure to provision...")
     wait_for_claims_ready(project_dir)
 
-    typer.echo("[6/7] Creating application secrets...")
-    create_app_secrets(config.name)
+    typer.echo("[6/7] Creating secrets...")
+    create_db_credentials_secret(config.name)
+    seal_secrets(project_dir)
 
     typer.echo("[7/7] Configuring ArgoCD and waiting for sync...")
     setup_argocd_apps(project_dir)
