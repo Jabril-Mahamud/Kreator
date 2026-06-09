@@ -23,6 +23,10 @@ COPY --from=builder /build/public ./public
 
 COPY <<'ENTRYPOINT' /usr/local/bin/entrypoint.sh
 #!/bin/sh
+if [ -n "$API_URL" ]; then
+  find /home/appuser/.next/static -name '*.js' -exec \
+    sed -i "s|http://api.localhost|$API_URL|g" {} +
+fi
 export NEXT_PUBLIC_API_URL="${API_URL:-http://api.localhost}"
 exec node server.js
 ENTRYPOINT
