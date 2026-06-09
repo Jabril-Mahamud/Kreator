@@ -50,9 +50,15 @@ def _check_cluster(name: str) -> None:
     _pass("Kind cluster running")
 
     result = run(
-        ["kubectl", "get", "nodes",
-         "-o", "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}"],
-        capture=True, check=False,
+        [
+            "kubectl",
+            "get",
+            "nodes",
+            "-o",
+            "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}",
+        ],
+        capture=True,
+        check=False,
     )
     if result.returncode == 0 and result.stdout:
         statuses = result.stdout.split()
@@ -71,7 +77,8 @@ def _check_cluster(name: str) -> None:
 
     result = run(
         ["kubectl", "get", "crd", "databases.kreator.dev"],
-        capture=True, check=False,
+        capture=True,
+        check=False,
     )
     if result.returncode == 0:
         _pass("XRD CRD registered (databases.kreator.dev)")
@@ -80,7 +87,8 @@ def _check_cluster(name: str) -> None:
 
     result = run(
         ["kubectl", "get", "compositions.apiextensions.crossplane.io"],
-        capture=True, check=False,
+        capture=True,
+        check=False,
     )
     if result.returncode == 0 and "local-database" in result.stdout:
         _pass("Local database composition exists")
@@ -89,7 +97,8 @@ def _check_cluster(name: str) -> None:
 
     result = run(
         ["kubectl", "get", f"databases.kreator.dev/{name}-db", "-o", "name"],
-        capture=True, check=False,
+        capture=True,
+        check=False,
     )
     if result.returncode == 0 and result.stdout.strip():
         _pass(f"Database claim applied ({name}-db)")
@@ -97,9 +106,9 @@ def _check_cluster(name: str) -> None:
         _fail(f"Database claim not found ({name}-db)")
 
     result = run(
-        ["kubectl", "get", "statefulset", f"{name}-db",
-         "-o", "jsonpath={.status.readyReplicas}"],
-        capture=True, check=False,
+        ["kubectl", "get", "statefulset", f"{name}-db", "-o", "jsonpath={.status.readyReplicas}"],
+        capture=True,
+        check=False,
     )
     if result.returncode == 0 and result.stdout.strip() == "1":
         _pass("Database pod ready")
@@ -107,9 +116,17 @@ def _check_cluster(name: str) -> None:
         _fail("Database pod not ready")
 
     result = run(
-        ["kubectl", "get", "pods", "-l", f"app.kubernetes.io/name={name}-backend",
-         "-o", "jsonpath={.items[*].status.containerStatuses[*].ready}"],
-        capture=True, check=False,
+        [
+            "kubectl",
+            "get",
+            "pods",
+            "-l",
+            f"app.kubernetes.io/name={name}-backend",
+            "-o",
+            "jsonpath={.items[*].status.containerStatuses[*].ready}",
+        ],
+        capture=True,
+        check=False,
     )
     if result.returncode == 0 and "true" in result.stdout:
         _pass("Backend pod ready")
@@ -120,7 +137,8 @@ def _check_cluster(name: str) -> None:
 def _check_helm_release(release: str, namespace: str) -> None:
     result = run(
         ["helm", "status", release, "-n", namespace],
-        capture=True, check=False,
+        capture=True,
+        check=False,
     )
     if result.returncode == 0:
         _pass(f"Helm release: {release} ({namespace})")
@@ -130,9 +148,18 @@ def _check_helm_release(release: str, namespace: str) -> None:
 
 def _check_deployment(name: str, namespace: str) -> None:
     result = run(
-        ["kubectl", "get", "deployment", name, "-n", namespace,
-         "-o", "jsonpath={.status.readyReplicas}"],
-        capture=True, check=False,
+        [
+            "kubectl",
+            "get",
+            "deployment",
+            name,
+            "-n",
+            namespace,
+            "-o",
+            "jsonpath={.status.readyReplicas}",
+        ],
+        capture=True,
+        check=False,
     )
     if result.returncode == 0 and result.stdout.strip():
         _pass(f"Deployment: {name} ({namespace})")

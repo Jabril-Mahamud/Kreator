@@ -242,3 +242,31 @@ def test_render_project_helm_values_parameterized(tmp_path: Path) -> None:
     values = (output / "deploy" / "helm" / "frontend" / "values.yaml").read_text()
     assert "localhost:5001/myapp-frontend" in values
     assert "frontend.localhost" in values
+
+
+def test_fastapi_cors_credentials_false(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", backend="fastapi")
+    output = tmp_path / "myapp"
+    render_project(config, output)
+
+    main_py = (output / "apps" / "backend" / "app" / "main.py").read_text()
+    assert "allow_credentials=False" in main_py
+    assert "allow_credentials=True" not in main_py
+
+
+def test_fastapi_no_alembic_dependency(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", backend="fastapi")
+    output = tmp_path / "myapp"
+    render_project(config, output)
+
+    pyproject = (output / "apps" / "backend" / "pyproject.toml").read_text()
+    assert "alembic" not in pyproject
+
+
+def test_fastapi_json_logger_version(tmp_path: Path) -> None:
+    config = KreatorConfig(name="myapp", backend="fastapi")
+    output = tmp_path / "myapp"
+    render_project(config, output)
+
+    pyproject = (output / "apps" / "backend" / "pyproject.toml").read_text()
+    assert "python-json-logger>=3.1" in pyproject
