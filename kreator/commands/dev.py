@@ -115,7 +115,7 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
     password = get_argocd_password()
     typer.echo("\nLocal dev environment ready!")
     typer.echo("\nArgoCD is syncing your apps. Watch progress in the dashboard:")
-    typer.echo(f"\n  ArgoCD:   http://localhost:9080/argocd  (admin / {password})")
+    typer.echo(f"\n  ArgoCD:   http://argocd.localhost:9080  (admin / {password})")
     for fe in config.web_frontends:
         typer.echo(f"  {fe.name}: http://{fe.name}.localhost:9080")
     typer.echo("  Backend:  http://api.localhost:9080")

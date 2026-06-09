@@ -157,9 +157,7 @@ def install_argocd() -> None:
             "-n",
             "argocd",
             "-p",
-            '{"data": {"server.insecure": "true",'
-            ' "server.basehref": "/argocd",'
-            ' "server.rootpath": "/argocd"}}',
+            '{"data": {"server.insecure": "true"}}',
         ],
         check=False,
     )
@@ -168,6 +166,8 @@ def install_argocd() -> None:
         _wait_for_deployment("argocd-server", "argocd", timeout=300)
     except RuntimeError:
         logger.warning("argocd-server not ready yet, it will become available in the background")
+
+    _set_argocd_admin_password()
 
     run(
         ["kubectl", "rollout", "restart", "deployment/argocd-server", "-n", "argocd"],
@@ -183,9 +183,10 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-    - http:
+    - host: argocd.localhost
+      http:
         paths:
-          - path: /argocd
+          - path: /
             pathType: Prefix
             backend:
               service:
@@ -194,6 +195,39 @@ spec:
                   number: 80
 """
     run(["kubectl", "apply", "-f", "-"], input=ingress_yaml)
+
+
+ARGOCD_ADMIN_PASSWORD = "admin123"
+
+
+def _set_argocd_admin_password() -> None:
+    """Set the ArgoCD admin password to a known value."""
+    import base64
+
+    import bcrypt
+
+    hashed = bcrypt.hashpw(
+        ARGOCD_ADMIN_PASSWORD.encode(), bcrypt.gensalt(rounds=10)
+    ).decode()
+    encoded = base64.b64encode(hashed.encode()).decode()
+    mtime = base64.b64encode(
+        time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()).encode()
+    ).decode()
+
+    run(
+        [
+            "kubectl",
+            "patch",
+            "secret",
+            "argocd-secret",
+            "-n",
+            "argocd",
+            "-p",
+            f'{{"data": {{"admin.password": "{encoded}",'
+            f' "admin.passwordMtime": "{mtime}"}}}}',
+        ],
+        check=False,
+    )
 
 
 def install_ingress_nginx() -> None:
@@ -449,26 +483,8 @@ def setup_argocd_apps(project_dir: Path) -> None:
 
 
 def get_argocd_password() -> str:
-    """Get the ArgoCD initial admin password."""
-    result = run(
-        [
-            "kubectl",
-            "get",
-            "secret",
-            "argocd-initial-admin-secret",
-            "-n",
-            "argocd",
-            "-o",
-            "jsonpath={.data.password}",
-        ],
-        capture=True,
-        check=False,
-    )
-    if result.returncode != 0 or not result.stdout.strip():
-        return "<not yet available>"
-    import base64
-
-    return base64.b64decode(result.stdout.strip()).decode()
+    """Get the ArgoCD admin password."""
+    return ARGOCD_ADMIN_PASSWORD
 
 
 def wait_for_argocd_sync(app_names: list[str], timeout: int = 300) -> None:
