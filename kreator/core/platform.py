@@ -573,6 +573,7 @@ def seal_secrets(project_dir: Path) -> None:
         if result.returncode == 0 and result.stdout.strip():
             sealed_file.write_text(result.stdout)
             logger.info("sealed secret written to %s", sealed_file)
+            run(["kubectl", "apply", "-f", str(sealed_file)], check=False)
         else:
             logger.warning(
                 "kubeseal failed for %s (exit %d), applying raw secret as fallback",
