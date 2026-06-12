@@ -85,17 +85,19 @@ def deploy(
     install_argocd()
 
     typer.echo("[4/7] Applying Civo infrastructure...")
+    from kreator.core.shell import run
+    run(["kubectl", "create", "namespace", config.name], check=False)
     apply_civo_manifests(project_dir)
 
     typer.echo("[5/7] Waiting for infrastructure to provision...")
     wait_for_claims_ready(project_dir)
 
     typer.echo("[6/7] Creating secrets...")
-    create_db_credentials_secret(config.name)
+    create_db_credentials_secret(config.name, namespace=config.name)
     seal_secrets(project_dir)
 
     typer.echo("[7/7] Configuring ArgoCD and waiting for sync...")
-    setup_argocd_apps(project_dir)
+    setup_argocd_apps(project_dir, config.name)
 
     app_names = [f"{config.name}-backend"]
     for fe in config.web_frontends:

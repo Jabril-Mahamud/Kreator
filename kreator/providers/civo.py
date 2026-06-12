@@ -129,7 +129,7 @@ def wait_for_claims_ready(project_dir: Path, timeout: int = 600) -> None:
     raise RuntimeError(f"Claims not ready after {timeout}s")
 
 
-def create_db_credentials_secret(config_name: str) -> None:
+def create_db_credentials_secret(config_name: str, namespace: str = "default") -> None:
     """Read Civo database connection details and create the db-credentials secret.
 
     The local composition creates this secret via Crossplane, but the Civo
@@ -172,7 +172,7 @@ def create_db_credentials_secret(config_name: str) -> None:
 
     secret_name = f"{config_name}-db-credentials"
     run(
-        ["kubectl", "delete", "secret", secret_name, "-n", "default"],
+        ["kubectl", "delete", "secret", secret_name, "-n", namespace],
         check=False,
     )
     run(
@@ -184,7 +184,7 @@ def create_db_credentials_secret(config_name: str) -> None:
             secret_name,
             f"--from-literal=DATABASE_URL={database_url}",
             "-n",
-            "default",
+            namespace,
         ]
     )
     logger.info("db credentials secret created for %s", config_name)

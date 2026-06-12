@@ -202,13 +202,19 @@ ARGOCD_ADMIN_PASSWORD = "admin123"
 
 def _set_argocd_admin_password() -> None:
     """Set the ArgoCD admin password to a known value."""
+    _set_argocd_account_password("admin", ARGOCD_ADMIN_PASSWORD)
+
+
+def _set_argocd_account_password(key_prefix: str, password: str) -> None:
+    """Patch a bcrypt password into argocd-secret under the given key prefix.
+
+    Use "admin" for the built-in admin, "accounts.<name>" for local users.
+    """
     import base64
 
     import bcrypt
 
-    hashed = bcrypt.hashpw(
-        ARGOCD_ADMIN_PASSWORD.encode(), bcrypt.gensalt(rounds=10)
-    ).decode()
+    hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=10)).decode()
     encoded = base64.b64encode(hashed.encode()).decode()
     mtime = base64.b64encode(
         time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()).encode()
@@ -223,8 +229,8 @@ def _set_argocd_admin_password() -> None:
             "-n",
             "argocd",
             "-p",
-            f'{{"data": {{"admin.password": "{encoded}",'
-            f' "admin.passwordMtime": "{mtime}"}}}}',
+            f'{{"data": {{"{key_prefix}.password": "{encoded}",'
+            f' "{key_prefix}.passwordMtime": "{mtime}"}}}}',
         ],
         check=False,
     )
@@ -380,14 +386,14 @@ def apply_manifests(project_dir: Path) -> None:
             logger.warning("database claims may not have been applied correctly")
 
 
-def wait_for_db_ready(name: str, timeout: int = 180) -> None:
+def wait_for_db_ready(name: str, namespace: str = "default", timeout: int = 180) -> None:
     """Wait for the Crossplane-managed database StatefulSet to have a ready pod."""
     sts_name = f"{name}-db"
     logger.info("waiting for database to be ready (%s)", sts_name)
     start = time.time()
     while time.time() - start < timeout:
         result = run(
-            ["kubectl", "get", "statefulset", sts_name, "-o", "jsonpath={.status.readyReplicas}"],
+            ["kubectl", "get", "statefulset", sts_name, "-n", namespace, "-o", "jsonpath={.status.readyReplicas}"],
             capture=True,
             check=False,
         )
@@ -467,15 +473,91 @@ def _wait_for_pod_ready(name: str, namespace: str, timeout: int = 120) -> None:
     logger.warning("pod %s not ready after %ds", name, timeout)
 
 
-def setup_argocd_apps(project_dir: Path) -> None:
-    """Apply the ArgoCD root Application (app-of-apps) from the project directory.
+def create_argocd_project_user(project_name: str) -> None:
+    """Create a project-scoped ArgoCD local user that only sees this project's apps.
 
-    The root app points at deploy/argocd/apps in the git source and auto-discovers
-    child Applications. The repoURL in the on-disk files must already be correct
-    for the target environment (patched for local dev, or rendered with a real
-    repo_url for cloud deploy).
+    The user is named after the project and shares the known dev password.
+    Logging in as it filters the dashboard to this project; admin still sees all.
     """
+    import json
+
+    logger.info("creating project-scoped argocd user: %s", project_name)
+
+    run(
+        [
+            "kubectl",
+            "patch",
+            "configmap",
+            "argocd-cm",
+            "-n",
+            "argocd",
+            "-p",
+            json.dumps({"data": {f"accounts.{project_name}": "login"}}),
+        ],
+        check=False,
+    )
+
+    rules = [
+        f"p, {project_name}, applications, *, {project_name}/*, allow",
+        f"p, {project_name}, projects, get, {project_name}, allow",
+        f"p, {project_name}, logs, get, {project_name}/*, allow",
+        f"p, {project_name}, exec, create, {project_name}/*, allow",
+    ]
+    result = run(
+        [
+            "kubectl",
+            "get",
+            "configmap",
+            "argocd-rbac-cm",
+            "-n",
+            "argocd",
+            "-o",
+            "jsonpath={.data.policy\\.csv}",
+        ],
+        capture=True,
+        check=False,
+    )
+    existing = result.stdout.strip().splitlines() if result.returncode == 0 else []
+    policy = existing + [r for r in rules if r not in existing]
+    run(
+        [
+            "kubectl",
+            "patch",
+            "configmap",
+            "argocd-rbac-cm",
+            "-n",
+            "argocd",
+            "-p",
+            json.dumps({"data": {"policy.csv": "\n".join(policy) + "\n"}}),
+        ],
+        check=False,
+    )
+
+    _set_argocd_account_password(f"accounts.{project_name}", ARGOCD_ADMIN_PASSWORD)
+
+    run(
+        ["kubectl", "rollout", "restart", "deployment/argocd-server", "-n", "argocd"],
+        check=False,
+    )
+
+
+def setup_argocd_apps(project_dir: Path, project_name: str) -> None:
+    """Create the ArgoCD AppProject and apply the root Application (app-of-apps).
+
+    Creates the target namespace if it does not exist, then applies the
+    AppProject so ArgoCD knows about the project before the root app
+    tries to reference it.
+    """
+    run(["kubectl", "create", "namespace", project_name], check=False)
+    create_argocd_project_user(project_name)
+
     argocd_dir = project_dir / "deploy" / "argocd"
+
+    appproject = argocd_dir / "appproject.yaml"
+    if appproject.exists():
+        logger.info("applying argocd appproject for %s", project_name)
+        run(["kubectl", "apply", "-f", str(appproject)])
+
     root_app = argocd_dir / "root-app.yaml"
     if root_app.exists():
         logger.info("applying argocd root application (app-of-apps)")

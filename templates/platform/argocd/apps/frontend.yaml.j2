@@ -4,14 +4,14 @@ metadata:
   name: {{ name }}-{{ frontend_name }}
   namespace: argocd
 spec:
-  project: default
+  project: {{ name }}
   source:
     repoURL: {{ repo_url }}
     targetRevision: HEAD
     path: deploy/helm/{{ frontend_name }}
   destination:
     server: https://kubernetes.default.svc
-    namespace: default
+    namespace: {{ name }}
   syncPolicy:
     automated:
       prune: true

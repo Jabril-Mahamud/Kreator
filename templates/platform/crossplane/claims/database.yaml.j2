@@ -2,11 +2,11 @@ apiVersion: kreator.dev/v1alpha1
 kind: Database
 metadata:
   name: {{ name }}-db
-  namespace: default
+  namespace: {{ name }}
 spec:
   parameters:
     name: {{ name }}-db
-    namespace: default
+    namespace: {{ name }}
     size: small
   compositionSelector:
     matchLabels:

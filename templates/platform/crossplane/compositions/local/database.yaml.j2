@@ -21,7 +21,7 @@ spec:
               kind: Secret
               metadata:
                 name: {{ name }}-db-credentials
-                namespace: default
+                namespace: {{ name }}
               type: Opaque
               stringData:
                 POSTGRES_USER: postgres
@@ -45,7 +45,7 @@ spec:
               kind: StatefulSet
               metadata:
                 name: {{ name }}-db
-                namespace: default
+                namespace: {{ name }}
               spec:
                 serviceName: {{ name }}-db
                 replicas: 1
@@ -94,7 +94,7 @@ spec:
               kind: Service
               metadata:
                 name: {{ name }}-db
-                namespace: default
+                namespace: {{ name }}
               spec:
                 selector:
                   app: {{ name }}-db

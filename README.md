@@ -78,6 +78,8 @@ The generated project does not depend on the Kreator CLI to run after scaffoldin
 
 Access your web frontends at `http://<name>.localhost:9080` (e.g. `http://frontend.localhost:9080`) and the backend at `http://api.localhost:9080`.
 
+The ArgoCD dashboard is at `http://argocd.localhost:9080`. Each project gets its own ArgoCD user, named after the project, that only sees that project's applications. Log in with `<project-name> / admin123` for the scoped view, or `admin / admin123` to see everything on the cluster. This matters when you run `kreator dev` from more than one project against the same Kind cluster; the project user keeps the dashboard clean.
+
 Mobile frontends are not deployed to the local cluster. Run `cd apps/<name> && npx expo start` to start the Expo dev server.
 
 Add `--with-observability` to install the LGTM stack (Loki, Grafana, Tempo, Mimir).

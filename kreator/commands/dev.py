@@ -23,6 +23,7 @@ from kreator.core.platform import (
     wait_for_db_ready,
 )
 from kreator.core.registry import build_and_push, start_registry, stop_registry
+from kreator.core.shell import run
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,7 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
     install_argocd()
 
     typer.echo("[4/6] Building and pushing images, sealing secrets...")
+    run(["kubectl", "create", "namespace", config.name], check=False)
     build_and_push(f"{config.name}-backend", str(project_dir / "apps" / "backend"))
     for fe in config.web_frontends:
         build_and_push(f"{config.name}-{fe.name}", str(project_dir / "apps" / fe.name))
@@ -102,11 +104,11 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
 
     typer.echo("[5/6] Applying infrastructure (XRDs, compositions, claims)...")
     apply_manifests(project_dir)
-    wait_for_db_ready(config.name)
+    wait_for_db_ready(config.name, namespace=config.name)
 
     typer.echo("[6/6] Deploying git server and configuring ArgoCD...")
     deploy_git_server()
-    setup_argocd_apps(project_dir)
+    setup_argocd_apps(project_dir, config.name)
 
     if with_observability:
         typer.echo("Installing observability stack...")
@@ -115,7 +117,9 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
     password = get_argocd_password()
     typer.echo("\nLocal dev environment ready!")
     typer.echo("\nArgoCD is syncing your apps. Watch progress in the dashboard:")
-    typer.echo(f"\n  ArgoCD:   http://argocd.localhost:9080  (admin / {password})")
+    typer.echo(f"\n  ArgoCD:   http://argocd.localhost:9080  ({config.name} / {password})")
+    typer.echo(f"            log in as '{config.name}' to see only this project's apps")
+    typer.echo(f"            (admin / {password} shows everything)")
     for fe in config.web_frontends:
         typer.echo(f"  {fe.name}: http://{fe.name}.localhost:9080")
     typer.echo("  Backend:  http://api.localhost:9080")

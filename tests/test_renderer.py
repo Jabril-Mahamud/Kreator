@@ -282,3 +282,32 @@ def test_fastapi_json_logger_version(tmp_path: Path) -> None:
 
     pyproject = (output / "apps" / "backend" / "pyproject.toml").read_text()
     assert "python-json-logger>=3.1" in pyproject
+
+
+def test_argocd_project_isolation(tmp_path: Path) -> None:
+    config = KreatorConfig(name="snowfall", backend="fastapi")
+    output = tmp_path / "snowfall"
+    render_project(config, output)
+
+    appproject = (output / "deploy" / "argocd" / "appproject.yaml").read_text()
+    assert "name: snowfall" in appproject
+    assert "namespace: snowfall" in appproject
+
+    for app_file in (output / "deploy" / "argocd").rglob("*.yaml"):
+        content = app_file.read_text()
+        if "kind: Application" in content:
+            assert "project: snowfall" in content, f"{app_file.name} uses wrong project"
+            assert "project: default" not in content, f"{app_file.name} still references default"
+
+    root_app = (output / "deploy" / "argocd" / "root-app.yaml").read_text()
+    assert "namespace: argocd" in root_app
+
+    backend_app = (output / "deploy" / "argocd" / "apps" / "backend.yaml").read_text()
+    assert "namespace: snowfall" in backend_app
+
+    claim = (output / "infrastructure" / "claims" / "database.yaml").read_text()
+    assert "namespace: snowfall" in claim
+    assert "namespace: default" not in claim
+
+    jwt = (output / "secrets" / "raw" / "jwt-secret.yaml").read_text()
+    assert "namespace: snowfall" in jwt

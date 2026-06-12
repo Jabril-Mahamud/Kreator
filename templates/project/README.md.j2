@@ -29,6 +29,20 @@ make deploy
 make destroy
 ```
 
+## Local URLs
+
+After `make dev`:
+
+{% for fe in frontends if fe.platform == "web" %}
+- {{ fe.name }}: http://{{ fe.name }}.localhost:9080
+{% endfor %}
+- Backend: http://api.localhost:9080
+- ArgoCD: http://argocd.localhost:9080 (log in with `{{ name }} / admin123` to see just this project, or `admin / admin123` for everything)
+{% for fe in frontends if fe.platform == "mobile" %}
+
+The {{ fe.name }} app is not deployed locally. Run `cd apps/{{ fe.name }} && npx expo start`.
+{% endfor %}
+
 ## Project structure
 
 ```
