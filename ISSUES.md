@@ -4,14 +4,18 @@ Issues found while dogfooding kreator on a real project (**JobHunterApp**,
 2026-06-14). Ordered roughly by severity. Items 1–2 are **template bugs that
 silently break every generated project**, so they're the priority.
 
-See also [TODO.md](TODO.md) for the image-rebuild auto-roll item (same dogfooding
-source).
+**Status:** all five are fixed. The image-rebuild auto-roll item in
+[TODO.md](TODO.md) is also done.
 
 ---
 
-## 1. Generated Next.js frontend can't reach the API from the browser (silent `:80` fallback)
+## 1. Generated Next.js frontend can't reach the API from the browser (silent `:80` fallback) [FIXED]
 
 **Severity: high — every generated nextjs app is broken in the browser until hand-patched.**
+
+**Resolved:** `templates/frontend/nextjs/Dockerfile.j2` now copies the static dir
+with `COPY --chown=1001:1001`, so the entrypoint `sed -i` rewrite runs as
+`appuser` and `NEXT_PUBLIC_API_URL` picks up the real `$API_URL` (with port).
 
 - **Root cause:** `templates/frontend/nextjs/Dockerfile.j2`. Line 21 copies the
   build output as root:
@@ -37,9 +41,14 @@ source).
   ```
 - **Discovered:** JobHunterApp (patched there; the template is still broken).
 
-## 2. Generated local Postgres loses all data on pod recreation (no persistent volume)
+## 2. Generated local Postgres loses all data on pod recreation (no persistent volume) [FIXED]
 
 **Severity: high — any db-pod restart wipes the local database.**
+
+**Resolved:** the local composition's StatefulSet now has a `volumeClaimTemplates`
+entry (`data`, 1Gi, `standard` storageClass) mounted at
+`/var/lib/postgresql/data`, with `PGDATA` set to a `pgdata` subdir. Data survives
+pod recreation. (Civo uses a managed database, so no PVC is needed there.)
 
 - **Root cause:** `templates/platform/crossplane/compositions/local/database.yaml.j2`.
   The `postgres-statefulset` resource (starts ~line 37) defines a StatefulSet with
@@ -53,9 +62,15 @@ source).
   at `/var/lib/postgresql/data`. Civo composition should be checked for the same.
 - **Discovered:** JobHunterApp.
 
-## 3. No lightweight way to get new commits into local ArgoCD (git-server snapshot)
+## 3. No lightweight way to get new commits into local ArgoCD (git-server snapshot) [FIXED]
 
 **Severity: medium — confusing; Argo shows "Synced" while behind HEAD.**
+
+**Resolved:** added `kreator dev --refresh`. It skips cluster creation and
+platform installs: it rebuilds and re-pins images, recreates the git-server pod
+so it re-clones the latest commit, and hard-refreshes the project's ArgoCD apps
+(`argocd.argoproj.io/refresh=hard`) so the new revision deploys. See `_refresh`
+in `kreator/commands/dev.py` and `hard_refresh_apps` in `kreator/core/platform.py`.
 
 - **Context:** local ArgoCD syncs from the in-cluster git-server, which serves a
   frozen `git clone --bare` snapshot. `kreator dev` recreates it
@@ -73,24 +88,30 @@ source).
   the stale-revision gap in `kreator doctor`.
 - **Discovered:** JobHunterApp.
 
-## 4. `kreator dev` auto-commits the user's working tree
+## 4. `kreator dev` auto-commits the user's working tree [FIXED]
 
 **Severity: medium — surprising; pollutes project history.**
 
-- **Root cause:** `_ensure_git_committed()` (`kreator/commands/dev.py:161`) runs
-  `git add -A && git commit -m "prepare for local dev"` on every run when the
-  tree is dirty (needed so the git-server can clone a clean HEAD).
-- **Symptom:** running `kreator dev` silently creates commits and sweeps in
+- **Symptom:** running `kreator dev` silently created commits and swept in
   whatever was in the working tree (WIP, unrelated edits), leaving noisy
   "prepare for local dev" commits on the user's branch.
-- **Fix idea:** warn/prompt before committing, scope the commit, or use a
-  throwaway/detached commit that isn't left on the user's branch.
-- **Discovered:** JobHunterApp. *(Confidence: medium — behavior is intentional,
-  but the side effects are rough.)*
 
-## 5. README hardcodes `:9080`, but per-project clusters assign different ports
+**Resolved:** `kreator dev` no longer commits to the user's branch. It now
+snapshots the working tree onto a dedicated `kreator-local-dev` branch using a
+throwaway index and `git commit-tree` (`_snapshot_dev_branch` in
+`kreator/commands/dev.py`), so the user's branch, HEAD, working tree, and index
+are never touched. The in-cluster git server serves that branch as HEAD via
+`git symbolic-ref` (`deploy_git_server` in `kreator/core/platform.py`), which is
+what ArgoCD tracks. WIP still gets deployed locally (that's the point of dev) but
+nothing lands on the user's real branch.
+
+## 5. README hardcodes `:9080`, but per-project clusters assign different ports [FIXED]
 
 **Severity: low — doc/UX mismatch.**
+
+**Resolved:** the README "Local development" section now uses a `<port>`
+placeholder and points readers at the `kreator dev` output and
+`~/.kreator/clusters.json` for the real per-project port.
 
 - **Root cause:** `README.md` "Local development" uses `:9080` in every example
   URL, but the per-project-clusters feature (`allocate_ports`) gives each project

@@ -76,9 +76,11 @@ The generated project does not depend on the Kreator CLI to run after scaffoldin
 - nginx ingress routing to frontend and backend
 - Images built and pushed to a local registry
 
-Access your web frontends at `http://<name>.localhost:9080` (e.g. `http://frontend.localhost:9080`) and the backend at `http://api.localhost:9080`.
+Each project gets its own Kind cluster with its own host port, so the port is not fixed. `kreator dev` prints the assigned port when it finishes (you can also find it in `~/.kreator/clusters.json`). Substitute it for `<port>` below.
 
-The ArgoCD dashboard is at `http://argocd.localhost:9080`. Each project gets its own ArgoCD user, named after the project, that only sees that project's applications. Log in with `<project-name> / admin123` for the scoped view, or `admin / admin123` to see everything on the cluster. This matters when you run `kreator dev` from more than one project against the same Kind cluster; the project user keeps the dashboard clean.
+Access your web frontends at `http://<name>.localhost:<port>` (e.g. `http://frontend.localhost:<port>`) and the backend at `http://api.localhost:<port>`.
+
+The ArgoCD dashboard is at `http://argocd.localhost:<port>`. Each project gets its own ArgoCD user, named after the project, that only sees that project's applications. Log in with `<project-name> / admin123` for the scoped view, or `admin / admin123` to see everything on the cluster. This matters when you run `kreator dev` from more than one project against the same Kind cluster; the project user keeps the dashboard clean.
 
 Mobile frontends are not deployed to the local cluster. Run `cd apps/<name> && npx expo start` to start the Expo dev server.
 

@@ -216,9 +216,7 @@ def _set_argocd_account_password(key_prefix: str, password: str) -> None:
 
     hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=10)).decode()
     encoded = base64.b64encode(hashed.encode()).decode()
-    mtime = base64.b64encode(
-        time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()).encode()
-    ).decode()
+    mtime = base64.b64encode(time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()).encode()).decode()
 
     run(
         [
@@ -393,7 +391,16 @@ def wait_for_db_ready(name: str, namespace: str = "default", timeout: int = 180)
     start = time.time()
     while time.time() - start < timeout:
         result = run(
-            ["kubectl", "get", "statefulset", sts_name, "-n", namespace, "-o", "jsonpath={.status.readyReplicas}"],
+            [
+                "kubectl",
+                "get",
+                "statefulset",
+                sts_name,
+                "-n",
+                namespace,
+                "-o",
+                "jsonpath={.status.readyReplicas}",
+            ],
             capture=True,
             check=False,
         )
@@ -405,6 +412,11 @@ def wait_for_db_ready(name: str, namespace: str = "default", timeout: int = 180)
 
 
 GIT_SERVER_URL = "git://git-server.default.svc/repo.git"
+
+# Local dev commits land on this dedicated branch instead of the user's branch,
+# so `kreator dev` never pollutes their working branch (see ISSUES.md #4). The
+# git server serves this branch as HEAD, which is what ArgoCD tracks.
+DEV_BRANCH = "kreator-local-dev"
 
 
 def deploy_git_server() -> None:
@@ -428,6 +440,9 @@ spec:
         - |
           git config --global --add safe.directory '*'
           cd /tmp && git clone --bare {PROJECT_MOUNT_PATH} repo.git
+          if git --git-dir=repo.git show-ref --verify --quiet refs/heads/{DEV_BRANCH}; then
+            git --git-dir=repo.git symbolic-ref HEAD refs/heads/{DEV_BRANCH}
+          fi
           apk add --no-cache git-daemon
           git daemon --reuseaddr --base-path=/tmp --export-all /tmp
       ports:
@@ -569,6 +584,49 @@ def setup_argocd_apps(project_dir: Path, project_name: str) -> None:
     if root_app.exists():
         logger.info("applying argocd root application (app-of-apps)")
         run(["kubectl", "apply", "-f", str(root_app)])
+
+
+def hard_refresh_apps(project_name: str) -> None:
+    """Force ArgoCD to re-pull from git for every application in a project.
+
+    Annotating an Application with a hard refresh makes ArgoCD drop its cached
+    manifests and re-read the git repo, so new commits served by the recreated
+    git server are picked up without a full `kreator dev` re-run (ISSUES.md #3).
+    """
+    result = run(
+        [
+            "kubectl",
+            "get",
+            "applications",
+            "-n",
+            "argocd",
+            "-o",
+            'jsonpath={range .items[?(@.spec.project=="'
+            + project_name
+            + '")]}{.metadata.name}{"\\n"}{end}',
+        ],
+        capture=True,
+        check=False,
+    )
+    names = [n for n in result.stdout.split() if n]
+    if not names:
+        logger.warning("no argocd applications found for project %s", project_name)
+        return
+    for name in names:
+        run(
+            [
+                "kubectl",
+                "annotate",
+                "application",
+                name,
+                "-n",
+                "argocd",
+                "argocd.argoproj.io/refresh=hard",
+                "--overwrite",
+            ],
+            check=False,
+        )
+        logger.info("hard-refreshed argocd app %s", name)
 
 
 def get_argocd_password() -> str:

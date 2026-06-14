@@ -84,10 +84,15 @@ def stop_registry() -> None:
     logger.info("registry stopped")
 
 
-def build_and_push(image_name: str, context_dir: str, registry_port: int = REGISTRY_PORT) -> str:
-    tag = f"localhost:{registry_port}/{image_name.lower()}:latest"
-    logger.info("building image: %s", tag)
-    run(["docker", "build", "-t", tag, context_dir])
-    logger.info("pushing image: %s", tag)
-    run(["docker", "push", tag])
-    return tag
+def build_and_push(
+    image_name: str,
+    context_dir: str,
+    registry_port: int = REGISTRY_PORT,
+    tag: str = "latest",
+) -> str:
+    ref = f"localhost:{registry_port}/{image_name.lower()}:{tag}"
+    logger.info("building image: %s", ref)
+    run(["docker", "build", "-t", ref, context_dir])
+    logger.info("pushing image: %s", ref)
+    run(["docker", "push", ref])
+    return ref

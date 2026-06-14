@@ -18,7 +18,7 @@ RUN addgroup -g 1001 appuser && adduser -u 1001 -G appuser -D appuser
 WORKDIR /home/appuser
 
 COPY --from=builder /build/.next/standalone ./
-COPY --from=builder /build/.next/static ./.next/static
+COPY --chown=1001:1001 --from=builder /build/.next/static ./.next/static
 COPY --from=builder /build/public ./public
 
 COPY <<'ENTRYPOINT' /usr/local/bin/entrypoint.sh

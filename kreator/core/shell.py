@@ -6,9 +6,12 @@ def run(
     check: bool = True,
     capture: bool = False,
     input: str | None = None,
+    env: dict | None = None,
 ) -> subprocess.CompletedProcess:
     try:
         kwargs: dict = {"check": check, "text": True}
+        if env is not None:
+            kwargs["env"] = env
         if input is not None:
             kwargs["input"] = input
             kwargs["capture_output"] = True
