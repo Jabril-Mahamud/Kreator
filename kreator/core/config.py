@@ -69,9 +69,7 @@ class KreatorConfig(BaseModel):
         # manifests downstream.
         slug = slugify_name(v)
         if not slug:
-            raise ValueError(
-                f"Project name '{v}' must contain at least one alphanumeric character"
-            )
+            raise ValueError(f"Project name '{v}' must contain at least one alphanumeric character")
         return slug
 
     @model_validator(mode="after")

@@ -86,6 +86,7 @@ def deploy(
 
     typer.echo("[4/7] Applying Civo infrastructure...")
     from kreator.core.shell import run
+
     run(["kubectl", "create", "namespace", config.name], check=False)
     apply_civo_manifests(project_dir)
 
