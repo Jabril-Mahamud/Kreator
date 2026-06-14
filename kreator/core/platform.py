@@ -455,6 +455,13 @@ spec:
       targetPort: 9418
 """
     logger.info("deploying in-cluster git server")
+    # The git server bare-clones the project at pod startup, so on re-runs we
+    # must recreate the pod to pick up new commits; otherwise ArgoCD keeps
+    # serving the snapshot from the first run and code changes never deploy.
+    run(
+        ["kubectl", "delete", "pod", "git-server", "-n", "default", "--ignore-not-found"],
+        check=False,
+    )
     run(["kubectl", "apply", "-f", "-"], input=manifest)
     _wait_for_pod_ready("git-server", "default", timeout=120)
 
