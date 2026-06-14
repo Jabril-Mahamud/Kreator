@@ -4,7 +4,7 @@ from typing import Optional
 
 import typer
 
-from kreator.core.config import FrontendSpec, KreatorConfig, discover_templates
+from kreator.core.config import FrontendSpec, KreatorConfig, discover_templates, slugify_name
 from kreator.core.renderer import render_project
 
 
@@ -46,6 +46,20 @@ def init(
             err=True,
         )
         raise typer.Exit(1)
+
+    slug = slugify_name(name)
+    if not slug:
+        typer.echo(
+            f"Error: project name '{name}' must contain at least one alphanumeric character",
+            err=True,
+        )
+        raise typer.Exit(1)
+    if slug != name:
+        typer.echo(
+            f"INFO: normalized project name '{name}' -> '{slug}' "
+            "(Kubernetes names must be lowercase RFC 1123 labels)"
+        )
+    name = slug
 
     output_dir = Path.cwd() / name
 

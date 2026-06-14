@@ -1,7 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from kreator.core.config import FrontendSpec, KreatorConfig, discover_templates, load_config
+from kreator.core.config import (
+    FrontendSpec,
+    KreatorConfig,
+    discover_templates,
+    load_config,
+    slugify_name,
+)
 
 
 def test_discover_frontend_templates() -> None:
@@ -84,6 +90,32 @@ def test_invalid_provider() -> None:
 def test_empty_name() -> None:
     with pytest.raises(ValidationError):
         KreatorConfig(name="")
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        ("JobHunterApp", "jobhunterapp"),
+        ("My_App", "my-app"),
+        ("  Spaced Name  ", "spaced-name"),
+        ("weird!!chars__here", "weird-chars-here"),
+        ("--lead-trail--", "lead-trail"),
+    ],
+)
+def test_slugify_name(raw: str, expected: str) -> None:
+    assert slugify_name(raw) == expected
+
+
+def test_name_is_normalized_to_rfc1123_label() -> None:
+    # An input that previously passed validation but produced invalid k8s
+    # namespaces must now be slugified to a lowercase RFC 1123 label.
+    config = KreatorConfig(name="JobHunterApp", frontend="nextjs", backend="fastapi")
+    assert config.name == "jobhunterapp"
+
+
+def test_name_with_no_valid_chars_rejected() -> None:
+    with pytest.raises(ValidationError):
+        KreatorConfig(name="!!!")
 
 
 def test_load_config(tmp_path: pytest.TempPathFactory) -> None:

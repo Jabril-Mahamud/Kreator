@@ -12,6 +12,17 @@ TEMPLATE_PLATFORMS: dict[str, str] = {
 }
 
 
+def slugify_name(v: str) -> str:
+    """Normalize a name into a valid RFC 1123 label (DNS-safe Kubernetes name).
+
+    Lowercases, collapses runs of non-alphanumeric characters into single
+    hyphens, and strips leading/trailing hyphens. Returns "" if nothing valid
+    remains.
+    """
+    s = re.sub(r"[^a-z0-9]+", "-", v.strip().lower())
+    return s.strip("-")
+
+
 def discover_templates(kind: str) -> list[str]:
     """Scan templates/<kind>/ and return available template names."""
     template_dir = TEMPLATES_DIR / kind
@@ -50,13 +61,18 @@ class KreatorConfig(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_name(cls, v: str) -> str:
-        if not v.isidentifier() and not all(c.isalnum() or c in "-_" for c in v):
-            raise ValueError(
-                f"Project name '{v}' must only contain alphanumeric, hyphens, or underscores"
-            )
-        if not v:
+        if not v or not v.strip():
             raise ValueError("Project name cannot be empty")
-        return v
+        # The name is used verbatim as a Kubernetes namespace and resource
+        # names, which must be lowercase RFC 1123 labels. Normalize it so an
+        # input like "JobHunterApp" or "My_App" can never produce invalid
+        # manifests downstream.
+        slug = slugify_name(v)
+        if not slug:
+            raise ValueError(
+                f"Project name '{v}' must contain at least one alphanumeric character"
+            )
+        return slug
 
     @model_validator(mode="after")
     def normalize_frontends(self) -> "KreatorConfig":
