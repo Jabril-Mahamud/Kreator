@@ -4,7 +4,15 @@ from pathlib import Path
 
 import typer
 
-from kreator.core.cluster import create_cluster, delete_cluster, wait_for_cluster_ready
+from kreator.core.cluster import (
+    allocate_ports,
+    cluster_name,
+    create_cluster,
+    delete_cluster,
+    list_kreator_clusters,
+    release_ports,
+    wait_for_cluster_ready,
+)
 from kreator.core.config import KreatorConfig, load_config
 from kreator.core.platform import (
     GIT_SERVER_URL,
@@ -41,10 +49,6 @@ def dev(
         stream=sys.stdout,
     )
 
-    if destroy:
-        _destroy()
-        return
-
     project_dir = Path.cwd()
     config_path = project_dir / "kreator.yaml"
 
@@ -56,14 +60,26 @@ def dev(
         raise typer.Exit(1)
 
     config = load_config(config_path)
+
+    if destroy:
+        _destroy(config)
+        return
+
     _setup(project_dir, config, with_observability)
 
 
-def _destroy() -> None:
-    typer.echo("Tearing down local dev environment...")
-    delete_cluster()
-    stop_registry()
-    typer.echo("Done. Cluster and registry removed.")
+def _destroy(config: KreatorConfig) -> None:
+    typer.echo(f"Tearing down local dev environment for '{config.name}'...")
+    name = cluster_name(config.name)
+    delete_cluster(name)
+    release_ports(name)
+    # The local registry is shared across all project clusters; only stop it
+    # once no kreator clusters remain.
+    if not list_kreator_clusters():
+        stop_registry()
+        typer.echo("Done. Cluster and registry removed.")
+    else:
+        typer.echo(f"Done. Cluster '{name}' removed (shared registry left running).")
 
 
 def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -> None:
@@ -83,7 +99,9 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
     start_registry()
 
     typer.echo("[2/6] Creating Kind cluster...")
-    create_cluster(project_dir)
+    name = cluster_name(config.name)
+    http_port, https_port = allocate_ports(name)
+    create_cluster(name, http_port, https_port, project_dir)
     wait_for_cluster_ready()
 
     _preload_images()
@@ -116,13 +134,14 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
 
     password = get_argocd_password()
     typer.echo("\nLocal dev environment ready!")
+    typer.echo(f"\nCluster: {name} (http {http_port}, https {https_port})")
     typer.echo("\nArgoCD is syncing your apps. Watch progress in the dashboard:")
-    typer.echo(f"\n  ArgoCD:   http://argocd.localhost:9080  ({config.name} / {password})")
+    typer.echo(f"\n  ArgoCD:   http://argocd.localhost:{http_port}  ({config.name} / {password})")
     typer.echo(f"            log in as '{config.name}' to see only this project's apps")
     typer.echo(f"            (admin / {password} shows everything)")
     for fe in config.web_frontends:
-        typer.echo(f"  {fe.name}: http://{fe.name}.localhost:9080")
-    typer.echo("  Backend:  http://api.localhost:9080")
+        typer.echo(f"  {fe.name}: http://{fe.name}.localhost:{http_port}")
+    typer.echo(f"  Backend:  http://api.localhost:{http_port}")
 
     for fe in config.mobile_frontends:
         typer.echo(
