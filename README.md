@@ -18,6 +18,9 @@ Requires Python 3.12+.
 kreator init my-app
 cd my-app
 kreator dev                  # Local Kind cluster with ArgoCD + Crossplane
+kreator dev --refresh        # Rebuild images and redeploy to a running cluster
+kreator dev --destroy        # Tear down the local dev environment
+kreator doctor               # Check prerequisites and cluster health
 kreator deploy               # Provision real infrastructure on Civo
 kreator destroy              # Tear down cloud resources
 ```
@@ -72,11 +75,13 @@ The generated project does not depend on the Kreator CLI to run after scaffoldin
 `kreator dev` stands up a Kind cluster with:
 
 - Crossplane (provider-kubernetes) provisioning a local Postgres
-- ArgoCD syncing your app from the local git repo
+- ArgoCD syncing your app from an in-cluster git server
 - nginx ingress routing to frontend and backend
 - Images built and pushed to a local registry
 
 Each project gets its own Kind cluster with its own host port, so the port is not fixed. `kreator dev` prints the assigned port when it finishes (you can also find it in `~/.kreator/clusters.json`). Substitute it for `<port>` below.
+
+After making code changes, use `kreator dev --refresh` for a fast edit/redeploy loop. It rebuilds images, updates the in-cluster git server, and triggers an ArgoCD hard refresh without recreating the cluster or reinstalling platform components.
 
 Access your web frontends at `http://<name>.localhost:<port>` (e.g. `http://frontend.localhost:<port>`) and the backend at `http://api.localhost:<port>`.
 
@@ -105,7 +110,8 @@ Tear down with `kreator destroy`.
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/
+pytest tests/                  # 92 unit tests
+./scripts/smoke.sh             # Full init + Docker build smoke test
 ruff check kreator/
 ruff format kreator/
 ```

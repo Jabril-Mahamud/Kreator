@@ -1,14 +1,13 @@
-# Kreator — Known Issues
+# Kreator — Known Issues (all fixed)
 
 Issues found while dogfooding kreator on a real project (**JobHunterApp**,
-2026-06-14). Ordered roughly by severity. Items 1–2 are **template bugs that
-silently break every generated project**, so they're the priority.
+2026-06-14). All five are fixed and guarded by regression tests in
+`tests/test_dogfood.py`. A heavier runtime check (build the images and verify
+the frontend API URL rewrite) lives in `scripts/smoke.sh`; it needs Docker so it
+runs manually, not in CI.
 
-**Status:** all five are fixed, and `tests/test_dogfood.py` now guards each one
-so it can't silently regress. The image-rebuild auto-roll item in
-[TODO.md](TODO.md) is also done. A heavier runtime check (build the images and
-verify the frontend API URL rewrite) lives in `scripts/smoke.sh`; it needs Docker
-so it runs manually, not in CI.
+This file is kept as a record of what was found and how it was fixed. New issues
+should be added at the top if discovered during further dogfooding.
 
 ---
 

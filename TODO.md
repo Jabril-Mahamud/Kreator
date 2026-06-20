@@ -1,12 +1,14 @@
 # Kreator TODO
 
-## Local dev
+## Phase 5 complete (2026-06-14)
 
-- [x] **Auto-roll workloads on image rebuild (`:latest` tag problem).**
-  Done via option 1 (immutable GitOps). `kreator dev` now commits the source,
-  reads the resulting git short SHA, builds and pushes images under that SHA tag,
-  patches `deploy/helm/*/values.yaml` `image.tag` to it, and commits the bump so
-  the in-cluster git server serves it. Every code change is a new SHA, so ArgoCD
-  sees a changed `image.tag` and rolls the workloads on its own. No more manual
-  `kubectl rollout restart`. See `_set_image_tags` / `_git_short_sha` in
-  `kreator/commands/dev.py`.
+All five build phases are done. See CLAUDE.md for the full phase checklist.
+
+## Next priorities (JobHunterApp-driven)
+
+- [ ] **GitHub Actions CI for Kreator itself.** Tests + lint on push/PR. Currently only runs locally.
+- [ ] **Verify Express and Go backends end-to-end.** FastAPI is battle-tested via JobHunterApp dogfooding. Express and Go templates exist but haven't been through a full `kreator dev` cycle.
+- [ ] **OAuth template support.** Snowfall (social bookmarking) needs OAuth for Twitter/Instagram/etc. Add an optional OAuth module to the backend templates.
+- [ ] **AWS provider.** Civo works. AWS would demonstrate broader cloud knowledge. The Crossplane abstraction makes this a Composition swap.
+- [ ] **Live demo deployment.** Deploy JobHunterApp to Civo via `kreator deploy` and link it in the README. A running app is worth more than any README.
+- [ ] **PyPI publishing.** `pip install kreator` instead of `pip install -e .`. Version bump automation.

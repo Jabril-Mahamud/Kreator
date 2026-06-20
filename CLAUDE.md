@@ -18,7 +18,11 @@ The developer experience:
 kreator init my-app          # Scaffold a project (interactive prompts or flags)
 cd my-app
 kreator dev                  # Spin up local Kind cluster, deploy via ArgoCD + Crossplane
+kreator dev --refresh        # Rebuild images and redeploy to a running cluster (fast edit loop)
+kreator dev --destroy        # Tear down the local dev environment
+kreator doctor               # Check prerequisites and cluster health
 kreator deploy               # Provision real infrastructure on Civo and deploy
+kreator destroy              # Tear down cloud resources
 ```
 
 Kreator is NOT a starter template repo you clone. It is a CLI tool that generates projects. The generated project is self-contained and does not depend on the Kreator CLI to run after scaffolding (though `kreator dev` and `kreator deploy` are convenience wrappers).
@@ -177,9 +181,10 @@ kreator/
     main.py                     # Typer app, entry point
     commands/
       init.py                   # kreator init
-      dev.py                    # kreator dev
+      dev.py                    # kreator dev (setup, --refresh, --destroy, --with-observability)
       deploy.py                 # kreator deploy
       destroy.py                # kreator destroy
+      doctor.py                 # kreator doctor (prerequisite + cluster health checks)
     core/
       config.py                 # Load/validate kreator.yaml
       renderer.py               # Jinja2 template rendering engine
@@ -212,7 +217,6 @@ kreator/
         backend/
       observability/
       ingress/
-      sealed-secrets/
     ci/
       mobile/                   # GitHub Actions workflow for EAS Build (rendered per mobile frontend)
     project/                    # Top-level project files
@@ -220,13 +224,23 @@ kreator/
       Makefile.j2
       README.md.j2
       .gitignore.j2
+      secrets/                  # Raw secrets template (.gitkeep)
   tests/
     test_init.py
     test_renderer.py
     test_config.py
+    test_cluster.py
+    test_doctor.py
+    test_dogfood.py
+    test_platform.py
+    test_prerequisites.py
+  scripts/
+    smoke.sh                    # Manual smoke test (init + Docker build)
   pyproject.toml
   README.md
   CLAUDE.md
+  ISSUES.md                     # Dogfooding bug log (all fixed, guarded by tests)
+  TODO.md                       # Current work items
 ```
 
 ## Crossplane patterns
@@ -341,10 +355,17 @@ pip install -e ".[dev]"
 # Run the CLI
 kreator init my-app
 kreator dev
+kreator dev --refresh          # Fast edit/redeploy loop
+kreator dev --destroy           # Tear down local cluster
+kreator doctor                  # Check tool prerequisites and cluster health
 kreator deploy
+kreator destroy
 
 # Run tests
 pytest tests/
+
+# Run smoke test (requires Docker, verifies full init+build pipeline)
+./scripts/smoke.sh
 
 # Lint
 ruff check kreator/
@@ -353,8 +374,9 @@ ruff format kreator/
 
 ## Testing approach
 
-- Unit tests for the template renderer, config loader, and provider logic
+- Unit tests for the template renderer, config loader, provider logic, cluster port allocation, and dogfood regression guards (92 tests, all passing)
 - Integration test: `kreator init` generates a project, verify file structure and content
+- Smoke test (`scripts/smoke.sh`): runs `kreator init` + Docker build to verify the full template pipeline produces buildable images. Requires Docker, runs manually.
 - No need to spin up Kind in CI for now. Local manual testing of Phase 2+ is fine.
 
 ## Style and conventions
