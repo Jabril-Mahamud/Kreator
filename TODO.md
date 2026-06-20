@@ -6,8 +6,8 @@ All five build phases are done. See CLAUDE.md for the full phase checklist.
 
 ## Next priorities (JobHunterApp-driven)
 
-- [ ] **GitHub Actions CI for Kreator itself.** Tests + lint on push/PR. Currently only runs locally.
-- [ ] **Verify Express and Go backends end-to-end.** FastAPI is battle-tested via JobHunterApp dogfooding. Express and Go templates exist but haven't been through a full `kreator dev` cycle.
+- [x] **GitHub Actions CI for Kreator itself.** Tests + lint on push/PR via `.github/workflows/ci.yml`, with a 3.12/3.13 test matrix and a separate lint job.
+- [x] **Verify Express and Go backends end-to-end.** Both went through `kreator init`, a Docker build, and a runtime check against a real Postgres (2026-06-20): `/healthz` returns 200 and register/login round-trips work. See the Phase 4 note in CLAUDE.md.
 - [ ] **OAuth template support.** Snowfall (social bookmarking) needs OAuth for Twitter/Instagram/etc. Add an optional OAuth module to the backend templates.
 - [ ] **AWS provider.** Civo works. AWS would demonstrate broader cloud knowledge. The Crossplane abstraction makes this a Composition swap.
 - [ ] **Live demo deployment.** Deploy JobHunterApp to Civo via `kreator deploy` and link it in the README. A running app is worth more than any README.
