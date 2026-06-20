@@ -334,6 +334,8 @@ Generated Helm charts follow these conventions:
 
 **Done when:** Observability works as an addon, multiple stack combinations are supported.
 
+> **Express + Go verified (2026-06-20).** Both backends went through `kreator init --frontend react --backend {express,go}`, a Docker build, and a runtime check against a real Postgres: `/healthz` returns 200 and register/login round-trips work for both. Backend Dockerfiles are correct (multi-stage, non-root uid 1001, EXPOSE 8000). Verifying these surfaced two latent bugs in the shared **React/Vite** frontend Dockerfile (same class as the Next.js `:80` fallback), both fixed: (1) `dist` was copied root-owned so the entrypoint `sed` API-URL rewrite failed silently for the non-root user (fixed with `COPY --chown=1001:1001`); (2) nginx couldn't start as uid 1001 because `/var/cache/nginx` and the pid file weren't writable (fixed by chowning them in the image). After the fixes the served bundle carries the real port-bearing API URL and nginx serves 200.
+
 ### Phase 5: Multi-frontend + mobile support
 - [x] `FrontendSpec` model with name, template, and platform (web/mobile)
 - [x] Repeatable `--frontend` flag with `name:template` syntax

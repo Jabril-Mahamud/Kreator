@@ -15,7 +15,7 @@ FROM nginx:alpine
 
 RUN addgroup -g 1001 appuser && adduser -u 1001 -G appuser -D appuser
 
-COPY --from=builder /build/dist /usr/share/nginx/html
+COPY --chown=1001:1001 --from=builder /build/dist /usr/share/nginx/html
 
 RUN printf 'server {\n\
     listen 3000;\n\
@@ -24,6 +24,13 @@ RUN printf 'server {\n\
         try_files $uri $uri/ /index.html;\n\
     }\n\
 }\n' > /etc/nginx/conf.d/default.conf
+
+# nginx runs as the non-root appuser, so every path the master process writes
+# (cache temp dirs, logs, pid file) must be owned by that user or it fails to
+# start with "mkdir() /var/cache/nginx/... failed (13: Permission denied)".
+RUN chown -R 1001:1001 /var/cache/nginx /var/log/nginx \
+    && touch /var/run/nginx.pid \
+    && chown 1001:1001 /var/run/nginx.pid
 
 COPY <<'ENTRYPOINT' /docker-entrypoint.d/90-map-api-url.sh
 #!/bin/sh

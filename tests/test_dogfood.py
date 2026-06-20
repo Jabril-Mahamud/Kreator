@@ -43,6 +43,23 @@ def test_nextjs_static_is_writable_by_runtime_user(project: Path) -> None:
     assert "COPY --chown=1001:1001 --from=builder /build/.next/static" in dockerfile
 
 
+def test_react_frontend_runs_nonroot_with_api_url_rewrite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """React/Vite frontend (same class as the nextjs #1 :80 fallback): the built
+    `dist` must be owned by the runtime user so the entrypoint `sed` can rewrite the
+    baked API URL, and nginx must be able to start as that non-root user (its cache
+    temp dirs and pid file have to be writable)."""
+    monkeypatch.chdir(tmp_path)
+    result = runner.invoke(
+        app, ["init", "demo-react", "--frontend", "react", "--backend", "express"]
+    )
+    assert result.exit_code == 0, result.output
+    dockerfile = (tmp_path / "demo-react" / "apps" / "frontend" / "Dockerfile").read_text()
+    assert "COPY --chown=1001:1001 --from=builder /build/dist" in dockerfile
+    assert "chown -R 1001:1001 /var/cache/nginx" in dockerfile
+
+
 def test_local_postgres_has_persistent_volume(project: Path) -> None:
     """Issue #2: the local postgres StatefulSet must persist PGDATA on a PVC so a
     pod restart does not wipe the database."""
