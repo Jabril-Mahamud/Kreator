@@ -11,6 +11,34 @@ should be added at the top if discovered during further dogfooding.
 
 ---
 
+## 6. `kreator dev --with-observability` fails: Loki chart requires object-storage bucketNames [FIXED]
+
+**Severity: high — `--with-observability` always aborts before the stack is up.**
+
+**Resolved:** `_install_loki` (`kreator/core/observability.py`) now installs Loki
+from a `_LOKI_VALUES` file that forces `deploymentMode: SingleBinary` with
+`loki.storage.type: filesystem` (plus a `schemaConfig`, `replication_factor: 1`,
+and zeroed `read`/`write`/`backend` replicas and caches). No object store / bucket
+names are required. Verified locally: `loki-0` comes up `2/2 Running`.
+
+- **Root cause:** the install passed `--set singleBinary.replicas=1` but left
+  `deploymentMode` at the chart default (`SimpleScalable`). The chart still
+  rendered the write statefulset, which requires object storage, so helm failed
+  at template time:
+  ```
+  Error: execution error at (loki/templates/write/statefulset-write.yaml:50:28):
+  Please define loki.storage.bucketNames.chunks
+  ```
+  Setting `singleBinary.replicas` does not switch the deployment mode.
+- **Why it's nasty:** the flag *looks* like it selects single-binary mode, but
+  the mode is controlled by the separate `deploymentMode` value; the error points
+  at storage config, not at the missed mode switch.
+- **Fix:** install with a values file pinning `deploymentMode: SingleBinary` +
+  filesystem storage + `schemaConfig`, instead of piecemeal `--set` flags.
+- **Discovered:** JobHunterApp (chart `grafana/loki` 7.0.0, app 3.6.7).
+
+---
+
 ## 1. Generated Next.js frontend can't reach the API from the browser (silent `:80` fallback) [FIXED]
 
 **Severity: high — every generated nextjs app is broken in the browser until hand-patched.**

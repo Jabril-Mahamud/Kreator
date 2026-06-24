@@ -327,12 +327,20 @@ def patch_claims_for_env(project_dir: Path, provider: str) -> None:
 
 
 def patch_argocd_repo_url(project_dir: Path, repo_url: str) -> None:
-    """Rewrite spec.source.repoURL in all ArgoCD Application manifests on disk."""
+    """Rewrite spec.source.repoURL in all ArgoCD Application manifests on disk.
+
+    Skips multi-document YAML files (e.g. observability.yaml with external Helm
+    chart sources that should never point at the local git server).
+    """
     argocd_dir = project_dir / "deploy" / "argocd"
     if not argocd_dir.is_dir():
         return
     for app_file in argocd_dir.rglob("*.yaml"):
-        doc = yaml.safe_load(app_file.read_text())
+        text = app_file.read_text()
+        docs = list(yaml.safe_load_all(text))
+        if len(docs) != 1:
+            continue
+        doc = docs[0]
         source = doc.get("spec", {}).get("source", {})
         if "repoURL" in source:
             source["repoURL"] = repo_url
