@@ -1,17 +1,61 @@
 import logging
+import tempfile
 
 from kreator.core.shell import run
 
 logger = logging.getLogger(__name__)
 
+# Loki's chart defaults to deploymentMode=SimpleScalable, which renders the
+# read/write/backend statefulsets and requires object-storage bucketNames
+# (helm fails with "Please define loki.storage.bucketNames.chunks"). For local
+# dev we force SingleBinary with filesystem storage and zero out the scalable
+# components, so no object store is needed.
+_LOKI_VALUES = """\
+loki:
+  auth_enabled: false
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  schemaConfig:
+    configs:
+      - from: "2024-04-01"
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: index_
+          period: 24h
+deploymentMode: SingleBinary
+singleBinary:
+  replicas: 1
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+chunksCache:
+  enabled: false
+resultsCache:
+  enabled: false
+monitoring:
+  selfMonitoring:
+    enabled: false
+    grafanaAgent:
+      installOperator: false
+test:
+  enabled: false
+"""
+
 
 def install_observability_stack() -> None:
-    """Install the LGTM observability stack: Loki, Grafana, Tempo, Mimir, Promtail."""
+    """Install the LGTM observability stack: Loki, Grafana, Tempo, Prometheus, Promtail."""
     run(["kubectl", "create", "namespace", "observability"], check=False)
 
     _install_loki()
     _install_tempo()
-    _install_mimir()
+    _install_prometheus()
     _install_promtail()
     _install_grafana()
 
@@ -32,6 +76,12 @@ def _install_loki() -> None:
     )
     run(["helm", "repo", "update"])
 
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix="-loki-values.yaml", delete=False
+    ) as f:
+        f.write(_LOKI_VALUES)
+        values_path = f.name
+
     run(
         [
             "helm",
@@ -41,16 +91,8 @@ def _install_loki() -> None:
             "grafana/loki",
             "--namespace",
             "observability",
-            "--set",
-            "loki.auth_enabled=false",
-            "--set",
-            "singleBinary.replicas=1",
-            "--set",
-            "monitoring.selfMonitoring.enabled=false",
-            "--set",
-            "monitoring.selfMonitoring.grafanaAgent.installOperator=false",
-            "--set",
-            "test.enabled=false",
+            "--values",
+            values_path,
             "--wait",
             "--timeout",
             "5m",
@@ -76,24 +118,35 @@ def _install_tempo() -> None:
     )
 
 
-def _install_mimir() -> None:
-    logger.info("installing mimir")
+def _install_prometheus() -> None:
+    logger.info("installing prometheus")
+    run(
+        [
+            "helm",
+            "repo",
+            "add",
+            "prometheus-community",
+            "https://prometheus-community.github.io/helm-charts",
+        ],
+        check=False,
+    )
+    run(["helm", "repo", "update"])
     run(
         [
             "helm",
             "upgrade",
             "--install",
-            "mimir",
-            "grafana/mimir-distributed",
+            "prometheus",
+            "prometheus-community/prometheus",
             "--namespace",
             "observability",
             "--set",
-            "mimir.structuredConfig.common.storage.backend=filesystem",
+            "alertmanager.enabled=false",
             "--set",
-            "minio.enabled=false",
+            "prometheus-pushgateway.enabled=false",
             "--wait",
             "--timeout",
-            "5m",
+            "3m",
         ]
     )
 
@@ -138,7 +191,7 @@ def _install_grafana() -> None:
             "--set",
             "datasources.datasources\\.yaml.datasources[0].type=prometheus",
             "--set",
-            "datasources.datasources\\.yaml.datasources[0].url=http://mimir-query-frontend:8080/prometheus",
+            "datasources.datasources\\.yaml.datasources[0].url=http://prometheus-server:80",
             "--set",
             "datasources.datasources\\.yaml.datasources[0].isDefault=true",
             "--set",
@@ -153,6 +206,12 @@ def _install_grafana() -> None:
             "datasources.datasources\\.yaml.datasources[2].type=tempo",
             "--set",
             "datasources.datasources\\.yaml.datasources[2].url=http://tempo:3100",
+            "--set",
+            "ingress.enabled=true",
+            "--set",
+            "ingress.ingressClassName=nginx",
+            "--set",
+            "ingress.hosts[0]=grafana.localhost",
             "--wait",
             "--timeout",
             "3m",
