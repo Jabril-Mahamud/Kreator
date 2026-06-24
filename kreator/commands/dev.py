@@ -178,8 +178,8 @@ def _setup(project_dir: Path, config: KreatorConfig, with_observability: bool) -
     setup_argocd_apps(project_dir, config.name)
 
     if with_observability:
-        typer.echo("Installing observability stack...")
-        _install_observability()
+        typer.echo("Waiting for observability stack (ArgoCD-managed)...")
+        _install_observability(config.name)
 
     password = get_argocd_password()
     typer.echo("\nLocal dev environment ready!")
@@ -327,7 +327,7 @@ def _preload_images() -> None:
         run(["docker", "push", local_tag])
 
 
-def _install_observability() -> None:
+def _install_observability(project_name: str) -> None:
     from kreator.core.observability import install_observability_stack
 
-    install_observability_stack()
+    install_observability_stack(project_name)
