@@ -289,7 +289,8 @@ def install_sealed_secrets() -> None:
             "repo",
             "add",
             "sealed-secrets",
-            "https://bitnami-labs.github.io/sealed-secrets",
+            "https://bitnami.github.io/sealed-secrets",
+            "--force-update",
         ],
         check=False,
     )
