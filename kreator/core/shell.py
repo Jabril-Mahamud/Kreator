@@ -1,4 +1,5 @@
 import subprocess
+import sys
 
 
 def run(
@@ -17,7 +18,13 @@ def run(
             kwargs["capture_output"] = True
         elif capture:
             kwargs["capture_output"] = True
-        return subprocess.run(cmd, **kwargs)
+        else:
+            # Pipe stderr (stdout still streams) so failures can report it.
+            kwargs["stderr"] = subprocess.PIPE
+        result = subprocess.run(cmd, **kwargs)
+        if kwargs.get("stderr") == subprocess.PIPE and result.stderr:
+            sys.stderr.write(result.stderr)
+        return result
     except subprocess.CalledProcessError as e:
         msg = f"Command failed: {' '.join(cmd)}"
         if e.stderr:
