@@ -295,9 +295,12 @@ def _set_image_tags(project_dir: Path, config: KreatorConfig, tag: str) -> None:
             continue
         text = values.read_text()
         # The image tag is the first `tag:` key in the generated values file.
+        # Quoted so YAML keeps it a string — an all-digit SHA with leading zeros
+        # (e.g. 0091588) would otherwise be parsed as an int, dropping the zeros
+        # and pinning a tag that doesn't exist in the registry.
         new_text = re.sub(
             r"^(\s*)tag:.*$",
-            rf"\g<1>tag: {tag}",
+            rf'\g<1>tag: "{tag}"',
             text,
             count=1,
             flags=re.MULTILINE,
