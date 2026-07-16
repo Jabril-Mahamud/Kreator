@@ -123,3 +123,9 @@ ruff format kreator/
 - **Deployment**: ArgoCD App-of-Apps pattern
 - **Local**: Kind cluster with local docker registry
 - **Cloud**: Civo (AWS planned later)
+
+
+## Repo's made using Kreator
+- **Burdens** https://github.com/Jabril-Mahamud/Burdens
+- **JobHunterApp** https://github.com/Jabril-Mahamud/JobHunterApp
+- **snowfall** https://github.com/Jabril-Mahamud/snowfall
