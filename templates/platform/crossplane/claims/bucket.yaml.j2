@@ -1,0 +1,12 @@
+apiVersion: kreator.dev/v1alpha1
+kind: Bucket
+metadata:
+  name: {{ name }}-bucket
+  namespace: {{ name }}
+spec:
+  parameters:
+    name: {{ name }}-bucket-{{ bucket_suffix }}
+    namespace: {{ name }}
+  compositionSelector:
+    matchLabels:
+      provider: {{ provider }}

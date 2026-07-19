@@ -21,7 +21,7 @@ kreator dev                  # Local Kind cluster with ArgoCD + Crossplane
 kreator dev --refresh        # Rebuild images and redeploy to a running cluster
 kreator dev --destroy        # Tear down the local dev environment
 kreator doctor               # Check prerequisites and cluster health
-kreator deploy               # Provision real infrastructure on Civo
+kreator deploy               # Provision real infrastructure on Civo or AWS
 kreator destroy              # Tear down cloud resources
 ```
 
@@ -105,6 +105,18 @@ This provisions a Civo Kubernetes cluster and managed database via Crossplane, i
 Get a Civo API key at https://dashboard.civo.com/security.
 
 Tear down with `kreator destroy`.
+
+## Cloud deployment (AWS)
+
+```bash
+kreator init my-app --provider aws --region eu-west-1
+cd my-app
+kreator deploy --aws-credentials-file ~/.aws/credentials
+```
+
+The credentials file is standard AWS INI format (a `[default]` section with `aws_access_key_id` and `aws_secret_access_key`). You can also set `AWS_CREDENTIALS_FILE` instead of passing the flag. The file is read by kubectl to create an in-cluster secret; it is never written into project config or committed.
+
+AWS support currently provisions an S3 bucket via Crossplane (`infrastructure/claims/bucket.yaml`). S3 bucket names are global, so the generated name carries a random suffix baked in at init time (`<name>-bucket-<8 hex chars>`); it stays stable across deploys. RDS, VPC, and EKS support are planned; until EKS lands, `kreator deploy` on AWS provisions infrastructure only and does not deploy the app.
 
 ## Development on Kreator itself
 

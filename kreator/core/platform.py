@@ -25,6 +25,28 @@ def _wait_for_deployment(name: str, namespace: str, timeout: int = 180) -> None:
     )
 
 
+def wait_for_provider_ready(name: str, timeout: int = 180) -> None:
+    start = time.time()
+    while time.time() - start < timeout:
+        result = run(
+            [
+                "kubectl",
+                "get",
+                "provider",
+                name,
+                "-o",
+                "jsonpath={.status.conditions[?(@.type=='Healthy')].status}",
+            ],
+            capture=True,
+            check=False,
+        )
+        if result.returncode == 0 and "True" in result.stdout:
+            logger.info("provider %s is healthy", name)
+            return
+        time.sleep(5)
+    raise RuntimeError(f"Provider {name} not healthy after {timeout}s")
+
+
 def wait_for_crd(crd_name: str, timeout: int = 120) -> None:
     start = time.time()
     while time.time() - start < timeout:

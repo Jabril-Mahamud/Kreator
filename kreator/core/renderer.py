@@ -20,6 +20,15 @@ PLATFORM_DIR_MAP: dict[str, str] = {
 FRONTEND_HELM_PREFIX = "helm/frontend/"
 FRONTEND_ARGOCD_FILE = "argocd/apps/frontend.yaml.j2"
 
+# Rendered only when provider is aws: the bucket claim would otherwise be
+# applied by the civo deploy path (it applies the whole claims/ dir) and sit
+# pending with no matching composition.
+AWS_ONLY_PATHS = (
+    "crossplane/provider-configs/aws.yaml",
+    "crossplane/compositions/aws/",
+    "crossplane/claims/bucket.yaml.j2",
+)
+
 
 def _render_path(rel_str: str, context: dict) -> str:
     """Render Jinja2 expressions in a file path (e.g. '{{ frontend_name }}' in filenames)."""
@@ -112,6 +121,9 @@ def render_platform(output_dir: Path, context: dict, config: KreatorConfig) -> l
         rel = source.relative_to(platform_dir)
         rel_str = str(rel)
 
+        if config.provider != "aws" and rel_str.startswith(AWS_ONLY_PATHS):
+            continue
+
         if _is_frontend_helm_path(rel_str) or _is_frontend_argocd_path(rel_str):
             for fe in web_frontends:
                 fe_context = {
@@ -160,6 +172,9 @@ def render_project(config: KreatorConfig, output_dir: Path) -> list[Path]:
         "region": config.region,
         "repo_url": config.repo_url or f"https://github.com/OWNER/{config.name}.git",
         "jwt_secret": _secrets.token_urlsafe(32),
+        # S3 bucket names are global; a fixed suffix baked in at init time keeps
+        # the name stable across deploys while avoiding collisions.
+        "bucket_suffix": _secrets.token_hex(4),
     }
 
     created: list[Path] = []

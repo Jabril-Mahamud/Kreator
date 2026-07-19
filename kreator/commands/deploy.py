@@ -1,10 +1,11 @@
 import logging
 import sys
 from pathlib import Path
+from typing import Optional
 
 import typer
 
-from kreator.core.config import load_config
+from kreator.core.config import KreatorConfig, load_config
 from kreator.core.platform import (
     install_argocd,
     install_crossplane,
@@ -14,6 +15,7 @@ from kreator.core.platform import (
     setup_argocd_apps,
     wait_for_argocd_sync,
 )
+from kreator.providers import aws as aws_provider
 from kreator.providers.civo import (
     apply_civo_manifests,
     create_db_credentials_secret,
@@ -23,37 +25,7 @@ from kreator.providers.civo import (
 )
 
 
-def deploy(
-    civo_api_key: str = typer.Option(
-        None, "--civo-api-key", envvar="CIVO_API_KEY", help="Civo API key"
-    ),
-) -> None:
-    """Deploy to cloud infrastructure via Crossplane."""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(levelname)s: %(message)s",
-        stream=sys.stdout,
-    )
-
-    project_dir = Path.cwd()
-    config_path = project_dir / "kreator.yaml"
-
-    if not config_path.exists():
-        typer.echo(
-            "Error: kreator.yaml not found. Run this from a kreator project directory.",
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    config = load_config(config_path)
-
-    if config.provider != "civo":
-        typer.echo(
-            f"Error: kreator deploy only supports civo provider, got '{config.provider}'",
-            err=True,
-        )
-        raise typer.Exit(1)
-
+def _deploy_civo(config: KreatorConfig, project_dir: Path, civo_api_key: str | None) -> None:
     if not civo_api_key:
         typer.echo(
             "Error: Civo API key required. Pass --civo-api-key or set CIVO_API_KEY env var.",
@@ -110,3 +82,88 @@ def deploy(
     typer.echo(f"  Provider: {config.provider}")
     typer.echo(f"  Region:   {config.region}")
     typer.echo("\nTo tear down: kreator destroy")
+
+
+def _deploy_aws(
+    config: KreatorConfig, project_dir: Path, aws_credentials_file: Path | None
+) -> None:
+    if not aws_credentials_file:
+        typer.echo(
+            "Error: AWS credentials file required. "
+            "Pass --aws-credentials-file or set AWS_CREDENTIALS_FILE env var.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    typer.echo(f"Deploying '{config.name}' to AWS ({config.region})...")
+
+    typer.echo("\n[1/4] Installing Crossplane...")
+    install_crossplane()
+
+    typer.echo("[2/4] Setting up AWS provider...")
+    try:
+        aws_provider.setup_aws_credentials_secret(aws_credentials_file)
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1)
+    aws_provider.install_crossplane_provider_aws()
+
+    typer.echo("[3/4] Applying AWS infrastructure...")
+    from kreator.core.shell import run
+
+    run(["kubectl", "create", "namespace", config.name], check=False)
+    aws_provider.apply_aws_manifests(project_dir)
+
+    typer.echo("[4/4] Waiting for infrastructure to provision...")
+    aws_provider.wait_for_claims_ready(project_dir)
+
+    typer.echo("\nDeployment complete!")
+    typer.echo(f"  Provider: {config.provider}")
+    typer.echo(f"  Region:   {config.region}")
+    typer.echo("\nNote: AWS support currently provisions S3 only. App deployment lands with EKS.")
+    typer.echo("To tear down: kreator destroy")
+
+
+def deploy(
+    civo_api_key: str = typer.Option(
+        None, "--civo-api-key", envvar="CIVO_API_KEY", help="Civo API key"
+    ),
+    aws_credentials_file: Optional[Path] = typer.Option(
+        None,
+        "--aws-credentials-file",
+        envvar="AWS_CREDENTIALS_FILE",
+        help="Path to an AWS credentials file (INI format with a [default] section)",
+    ),
+) -> None:
+    """Deploy to cloud infrastructure via Crossplane."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(levelname)s: %(message)s",
+        stream=sys.stdout,
+    )
+
+    project_dir = Path.cwd()
+    config_path = project_dir / "kreator.yaml"
+
+    if not config_path.exists():
+        typer.echo(
+            "Error: kreator.yaml not found. Run this from a kreator project directory.",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    config = load_config(config_path)
+
+    deployers = {
+        "civo": lambda: _deploy_civo(config, project_dir, civo_api_key),
+        "aws": lambda: _deploy_aws(config, project_dir, aws_credentials_file),
+    }
+    deployer = deployers.get(config.provider)
+    if deployer is None:
+        typer.echo(
+            f"Error: kreator deploy supports {', '.join(sorted(deployers))} providers, "
+            f"got '{config.provider}'",
+            err=True,
+        )
+        raise typer.Exit(1)
+    deployer()

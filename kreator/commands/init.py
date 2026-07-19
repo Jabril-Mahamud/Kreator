@@ -33,8 +33,10 @@ def init(
         None, "--frontend", "-f", help="Frontend spec: 'template' or 'name:template' (repeatable)"
     ),
     backend: str = typer.Option("fastapi", help="Backend template"),
-    provider: str = typer.Option("civo", help="Cloud provider (civo or local)"),
-    region: str = typer.Option("lon1", help="Provider region"),
+    provider: str = typer.Option("civo", help="Cloud provider (civo, aws, or local)"),
+    region: Optional[str] = typer.Option(
+        None, help="Provider region (default: lon1 for civo, eu-west-1 for aws)"
+    ),
     repo_url: str = typer.Option("", "--repo-url", help="Git repo URL for ArgoCD sync"),
 ) -> None:
     """Scaffold a new project."""
@@ -102,7 +104,7 @@ def init(
         typer.echo(f"  frontend: {fe.name} ({fe.template}, {fe.platform})")
     typer.echo(f"  backend:  {backend}")
     typer.echo(f"  provider: {provider}")
-    typer.echo(f"  region:   {region}")
+    typer.echo(f"  region:   {config.region}")
     typer.echo("\nNext steps:")
     typer.echo(f"  cd {name}")
     typer.echo("  kreator dev")

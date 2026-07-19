@@ -2,7 +2,7 @@ import logging
 import time
 from pathlib import Path
 
-from kreator.core.platform import wait_for_crd
+from kreator.core.platform import wait_for_crd, wait_for_provider_ready
 from kreator.core.shell import run
 
 logger = logging.getLogger(__name__)
@@ -46,29 +46,7 @@ spec:
     run(["kubectl", "apply", "-f", "-"], input=provider_yaml)
     logger.info("civo provider installed, waiting for CRDs")
 
-    _wait_for_provider_ready("provider-civo", timeout=180)
-
-
-def _wait_for_provider_ready(name: str, timeout: int = 180) -> None:
-    start = time.time()
-    while time.time() - start < timeout:
-        result = run(
-            [
-                "kubectl",
-                "get",
-                "provider",
-                name,
-                "-o",
-                "jsonpath={.status.conditions[?(@.type=='Healthy')].status}",
-            ],
-            capture=True,
-            check=False,
-        )
-        if result.returncode == 0 and "True" in result.stdout:
-            logger.info("provider %s is healthy", name)
-            return
-        time.sleep(5)
-    raise RuntimeError(f"Provider {name} not healthy after {timeout}s")
+    wait_for_provider_ready("provider-civo", timeout=180)
 
 
 def apply_civo_manifests(project_dir: Path) -> None:

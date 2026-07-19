@@ -84,7 +84,7 @@ def test_invalid_database() -> None:
 
 def test_invalid_provider() -> None:
     with pytest.raises(ValidationError, match="not supported"):
-        KreatorConfig(name="test", provider="aws")
+        KreatorConfig(name="test", provider="gcp")
 
 
 def test_empty_name() -> None:

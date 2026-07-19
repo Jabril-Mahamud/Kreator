@@ -1,0 +1,27 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: aws-bucket
+  labels:
+    crossplane.io/xrd: xbuckets.kreator.dev
+    provider: aws
+spec:
+  compositeTypeRef:
+    apiVersion: kreator.dev/v1alpha1
+    kind: XBucket
+  resources:
+    - name: aws-bucket
+      base:
+        apiVersion: s3.aws.upbound.io/v1beta1
+        kind: Bucket
+        spec:
+          forProvider:
+            region: {{ region }}
+            forceDestroy: true
+            tags:
+              kreator.dev/project: {{ name }}
+          providerConfigRef:
+            name: provider-aws
+      patches:
+        - fromFieldPath: spec.parameters.name
+          toFieldPath: metadata.annotations[crossplane.io/external-name]

@@ -41,7 +41,7 @@ These decisions are final. Do not revisit or suggest alternatives.
 
 5. **Interchangeable app stacks via templates.** Starting with Next.js (frontend) and FastAPI (backend). Templates are Jinja2-rendered. Adding a new stack means adding a new template directory, nothing else changes. Projects can have multiple frontends (e.g. web + mobile), each from a different template.
 
-6. **Default cloud provider is Civo.** AWS support comes later. Do not build AWS support until Civo is fully working.
+6. **Default cloud provider is Civo.** AWS is supported as a second provider, phase 1 scope: S3 buckets only (RDS/VPC/EKS later). Until EKS lands, `kreator deploy` on AWS provisions infrastructure only and does not deploy the app.
 
 ## Tech stack
 
@@ -49,7 +49,7 @@ These decisions are final. Do not revisit or suggest alternatives.
 - **Generated web frontend**: Next.js 14 (App Router, TypeScript, standalone output) or React/Vite
 - **Generated mobile frontend**: Expo (React Native) with Expo Router, EAS Build
 - **Generated backend**: FastAPI + SQLAlchemy 2.0 async + asyncpg + Alembic
-- **Infrastructure**: Crossplane with Kubernetes provider (local) and Civo provider (production)
+- **Infrastructure**: Crossplane with Kubernetes provider (local), Civo provider (production), and Upbound AWS providers (provider-family-aws + provider-aws-s3, production)
 - **GitOps**: ArgoCD with App-of-Apps
 - **Secrets**: Sealed Secrets (kubeseal)
 - **Observability**: Loki, Grafana, Tempo, Mimir, Promtail (opt-in addon)
@@ -82,11 +82,15 @@ my-app/
         database.yaml
       civo/                     # Civo: managed database resource
         database.yaml
+      aws/                      # AWS projects only: S3 bucket
+        bucket.yaml
     claims/                     # What the developer edits
       database.yaml             # "I need a postgres database"
+      bucket.yaml               # AWS projects only: "I need an S3 bucket" (name gets a random suffix, S3 names are global)
     provider-configs/
       local.yaml                # Crossplane Kubernetes provider config
       civo.yaml                 # Crossplane Civo provider config
+      aws.yaml                  # AWS projects only: Crossplane AWS provider config
   deploy/
     argocd/
       root-app.yaml             # App-of-Apps root
@@ -150,8 +154,8 @@ name: my-app
 frontend: nextjs          # nextjs | react | expo
 backend: fastapi          # fastapi | express | go
 database: postgres        # Only postgres for now
-provider: civo            # civo | local (local is implicit for kreator dev)
-region: lon1              # Provider-specific
+provider: civo            # civo | aws | local (local is implicit for kreator dev)
+region: lon1              # Provider-specific; defaults to lon1 (civo) or eu-west-1 (aws)
 repo_url: ""              # Git repo URL for ArgoCD sync (defaults to github.com/OWNER/<name>)
 ```
 
@@ -194,6 +198,7 @@ kreator/
       observability.py          # LGTM stack installer
     providers/
       civo.py                   # Civo Crossplane provider setup + resource management
+      aws.py                    # AWS Crossplane provider setup (S3 only for now) + credentials secret
   templates/
     frontend/
       nextjs/                   # Jinja2-templated Next.js app (web platform)
@@ -210,6 +215,7 @@ kreator/
         compositions/
           local/
           civo/
+          aws/
         provider-configs/
         claims/
       helm/
@@ -234,6 +240,7 @@ kreator/
     test_dogfood.py
     test_platform.py
     test_prerequisites.py
+    test_aws.py
   scripts/
     smoke.sh                    # Manual smoke test (init + Docker build)
   pyproject.toml
@@ -249,6 +256,7 @@ kreator/
 Use `kreator.dev` as the API group. Example:
 - `XDatabase` with group `kreator.dev`, version `v1alpha1`
 - Claim kind: `Database`
+- `XBucket` with group `kreator.dev`, version `v1alpha1` (AWS S3, claim kind: `Bucket`)
 
 ### Composition structure
 Each composition is environment-specific:

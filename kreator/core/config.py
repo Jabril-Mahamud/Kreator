@@ -55,7 +55,7 @@ class KreatorConfig(BaseModel):
     backend: str = "fastapi"
     database: str = "postgres"
     provider: str = "civo"
-    region: str = "lon1"
+    region: str | None = None
     repo_url: str = ""
 
     @field_validator("name")
@@ -120,9 +120,19 @@ class KreatorConfig(BaseModel):
     @field_validator("provider")
     @classmethod
     def validate_provider(cls, v: str) -> str:
-        if v not in ("civo", "local"):
-            raise ValueError(f"Provider '{v}' not supported. Choose 'civo' or 'local'")
+        if v not in ("civo", "local", "aws"):
+            raise ValueError(f"Provider '{v}' not supported. Choose 'civo', 'aws', or 'local'")
         return v
+
+    @model_validator(mode="after")
+    def resolve_region(self) -> "KreatorConfig":
+        if self.region is None:
+            self.region = "eu-west-1" if self.provider == "aws" else "lon1"
+        elif self.provider == "aws" and not re.match(r"^[a-z]{2}-[a-z]+-\d$", self.region):
+            raise ValueError(
+                f"Region '{self.region}' is not a valid AWS region (expected e.g. eu-west-1)"
+            )
+        return self
 
     @property
     def web_frontends(self) -> list[FrontendSpec]:
