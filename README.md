@@ -134,7 +134,7 @@ ruff format kreator/
 - **Infrastructure**: Crossplane XRDs with environment-specific Compositions
 - **Deployment**: ArgoCD App-of-Apps pattern
 - **Local**: Kind cluster with local docker registry
-- **Cloud**: Civo (AWS planned later)
+- **Cloud**: Civo, AWS (S3 only for now; RDS/VPC/EKS planned)
 
 
 ## Repo's made using Kreator
