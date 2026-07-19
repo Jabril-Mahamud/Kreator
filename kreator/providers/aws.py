@@ -67,28 +67,26 @@ def setup_aws_credentials_secret(credentials_path: Path) -> None:
     logger.info("aws credentials secret created")
 
 
+# Family must come first; the service providers depend on its CRDs.
+AWS_PROVIDERS = ("provider-family-aws", "provider-aws-s3", "provider-aws-rds", "provider-aws-ec2")
+
+
 def install_crossplane_provider_aws() -> None:
-    """Install the Crossplane AWS family and S3 providers."""
-    provider_yaml = f"""
-apiVersion: pkg.crossplane.io/v1
+    """Install the Crossplane AWS family, S3, RDS, and EC2 providers."""
+    provider_yaml = "\n---\n".join(
+        f"""apiVersion: pkg.crossplane.io/v1
 kind: Provider
 metadata:
-  name: provider-family-aws
+  name: {name}
 spec:
-  package: xpkg.upbound.io/upbound/provider-family-aws:{AWS_PROVIDER_VERSION}
----
-apiVersion: pkg.crossplane.io/v1
-kind: Provider
-metadata:
-  name: provider-aws-s3
-spec:
-  package: xpkg.upbound.io/upbound/provider-aws-s3:{AWS_PROVIDER_VERSION}
-"""
+  package: xpkg.upbound.io/upbound/{name}:{AWS_PROVIDER_VERSION}"""
+        for name in AWS_PROVIDERS
+    )
     run(["kubectl", "apply", "-f", "-"], input=provider_yaml)
     logger.info("aws providers installed, waiting for CRDs")
 
-    wait_for_provider_ready("provider-family-aws", timeout=300)
-    wait_for_provider_ready("provider-aws-s3", timeout=300)
+    for name in AWS_PROVIDERS:
+        wait_for_provider_ready(name, timeout=300)
 
 
 def apply_aws_manifests(project_dir: Path) -> None:
@@ -100,6 +98,7 @@ def apply_aws_manifests(project_dir: Path) -> None:
         logger.info("applying crossplane xrds")
         run(["kubectl", "apply", "-f", str(xrds)])
         wait_for_crd("buckets.kreator.dev")
+        wait_for_crd("databases.kreator.dev")
 
     provider_configs = infra_dir / "provider-configs"
     if provider_configs.is_dir():
@@ -114,16 +113,17 @@ def apply_aws_manifests(project_dir: Path) -> None:
         run(["kubectl", "apply", "-f", str(compositions_dir)])
         time.sleep(3)
 
-    # Phase 1 provisions S3 only, so apply just the bucket claim. The database
-    # claim has no aws composition yet and would sit pending forever.
-    claim = infra_dir / "claims" / "bucket.yaml"
-    if claim.exists():
-        logger.info("applying bucket claim")
-        run(["kubectl", "apply", "-f", str(claim)])
+    claims = infra_dir / "claims"
+    if claims.is_dir():
+        logger.info("applying crossplane claims")
+        run(["kubectl", "apply", "-f", str(claims)])
 
 
-def wait_for_claims_ready(project_dir: Path, timeout: int = 600) -> None:
-    """Wait for all Crossplane bucket claims to become ready."""
+def wait_for_claims_ready(project_dir: Path, timeout: int = 900) -> None:
+    """Wait for all Crossplane bucket and database claims to become ready.
+
+    RDS instances take 5-15 minutes to provision, hence the longer timeout.
+    """
     claims_dir = project_dir / "infrastructure" / "claims"
     if not claims_dir.is_dir():
         return
@@ -131,22 +131,27 @@ def wait_for_claims_ready(project_dir: Path, timeout: int = 600) -> None:
     logger.info("waiting for crossplane claims to be ready (this may take several minutes)")
     start = time.time()
     while time.time() - start < timeout:
-        result = run(
-            [
-                "kubectl",
-                "get",
-                "buckets.kreator.dev",
-                "-o",
-                "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}",
-            ],
-            capture=True,
-            check=False,
-        )
-        if result.returncode == 0 and result.stdout:
-            statuses = result.stdout.split()
-            if all(s == "True" for s in statuses):
-                logger.info("all claims ready")
-                return
+        all_ready = True
+        any_found = False
+        for kind in ("buckets.kreator.dev", "databases.kreator.dev"):
+            result = run(
+                [
+                    "kubectl",
+                    "get",
+                    kind,
+                    "-o",
+                    "jsonpath={.items[*].status.conditions[?(@.type=='Ready')].status}",
+                ],
+                capture=True,
+                check=False,
+            )
+            if result.returncode == 0 and result.stdout:
+                any_found = True
+                if not all(s == "True" for s in result.stdout.split()):
+                    all_ready = False
+        if any_found and all_ready:
+            logger.info("all claims ready")
+            return
         time.sleep(10)
     raise RuntimeError(f"Claims not ready after {timeout}s")
 
@@ -155,10 +160,10 @@ def delete_aws_resources(project_dir: Path) -> None:
     """Delete Crossplane claims and compositions for AWS."""
     infra_dir = project_dir / "infrastructure"
 
-    claim = infra_dir / "claims" / "bucket.yaml"
-    if claim.exists():
-        logger.info("deleting bucket claim")
-        run(["kubectl", "delete", "-f", str(claim)], check=False)
+    claims = infra_dir / "claims"
+    if claims.is_dir():
+        logger.info("deleting crossplane claims")
+        run(["kubectl", "delete", "-f", str(claims)], check=False)
 
     compositions_dir = infra_dir / "compositions" / "aws"
     if compositions_dir.is_dir():

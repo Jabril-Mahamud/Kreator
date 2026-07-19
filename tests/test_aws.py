@@ -68,6 +68,13 @@ def test_init_aws_generates_aws_files(run_in_tmp: Path) -> None:
     base = run_in_tmp / "my-app"
     assert (base / "infrastructure" / "provider-configs" / "aws.yaml").exists()
     assert (base / "infrastructure" / "compositions" / "aws" / "bucket.yaml").exists()
+    assert (base / "infrastructure" / "compositions" / "aws" / "database.yaml").exists()
+
+    db_composition = (
+        base / "infrastructure" / "compositions" / "aws" / "database.yaml"
+    ).read_text()
+    assert "instanceClass: db.t3.micro" in db_composition
+    assert "region: eu-west-1" in db_composition
     assert (base / "infrastructure" / "claims" / "bucket.yaml").exists()
     assert (base / "infrastructure" / "xrds" / "bucket.yaml").exists()
 

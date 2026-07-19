@@ -1,0 +1,95 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: aws-database
+  labels:
+    crossplane.io/xrd: xdatabases.kreator.dev
+    provider: aws
+spec:
+  compositeTypeRef:
+    apiVersion: kreator.dev/v1alpha1
+    kind: XDatabase
+  resources:
+    - name: db-security-group
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: SecurityGroup
+        spec:
+          forProvider:
+            region: {{ region }}
+            description: postgres access from within the default vpc
+            tags:
+              kreator.dev/project: {{ name }}
+          providerConfigRef:
+            name: provider-aws
+    - name: db-security-group-rule
+      base:
+        apiVersion: ec2.aws.upbound.io/v1beta1
+        kind: SecurityGroupRule
+        spec:
+          forProvider:
+            region: {{ region }}
+            type: ingress
+            fromPort: 5432
+            toPort: 5432
+            protocol: tcp
+            cidrBlocks:
+              - 172.31.0.0/16
+            securityGroupIdSelector:
+              matchControllerRef: true
+          providerConfigRef:
+            name: provider-aws
+    - name: rds-instance
+      base:
+        apiVersion: rds.aws.upbound.io/v1beta3
+        kind: Instance
+        spec:
+          forProvider:
+            region: {{ region }}
+            engine: postgres
+            engineVersion: "16"
+            instanceClass: db.t3.micro
+            allocatedStorage: 20
+            storageType: gp2
+            username: kreator
+            autoGeneratePassword: true
+            passwordSecretRef:
+              name: {{ name }}-db-master-password
+              namespace: crossplane-system
+              key: password
+            publiclyAccessible: false
+            skipFinalSnapshot: true
+            backupRetentionPeriod: 0
+            applyImmediately: true
+            vpcSecurityGroupIdSelector:
+              matchControllerRef: true
+            tags:
+              kreator.dev/project: {{ name }}
+          providerConfigRef:
+            name: provider-aws
+          writeConnectionSecretToRef:
+            name: {{ name }}-db-conn
+            namespace: crossplane-system
+      patches:
+        # The RDS identifier must be set in forProvider; upjet derives the
+        # external-name from the provider for this resource, so an
+        # external-name annotation patch is ignored at create time.
+        - fromFieldPath: spec.parameters.name
+          toFieldPath: spec.forProvider.identifier
+        - type: CombineFromComposite
+          combine:
+            variables:
+              - fromFieldPath: spec.parameters.name
+            strategy: string
+            string:
+              fmt: "%s-conn"
+          toFieldPath: spec.writeConnectionSecretToRef.name
+      connectionDetails:
+        - name: host
+          fromConnectionSecretKey: host
+        - name: port
+          fromConnectionSecretKey: port
+        - name: username
+          fromConnectionSecretKey: username
+        - name: password
+          fromConnectionSecretKey: password
